@@ -188,17 +188,11 @@ SOCIALACCOUNT_PROVIDERS = {
     }
 }
 
-ACCOUNT_AUTHENTICATION_METHOD = 'email'
-ACCOUNT_EMAIL_REQUIRED = True
-ACCOUNT_USERNAME_REQUIRED = False
-LOGIN_REDIRECT_URL = '/'  # o la URL que tú prefieras
-
+# Cambios según las nuevas configuraciones de django-allauth
+ACCOUNT_LOGIN_METHODS = {'email'}
+ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
+LOGIN_REDIRECT_URL = '/'
 ACCOUNT_LOGOUT_REDIRECT_URL = '/accounts/login/'
-
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8000", 
-]
-
 
 from datetime import timedelta
 
