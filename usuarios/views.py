@@ -11,18 +11,18 @@ class RegisterView(GenericAPIView):
     serializer_class = RegisterSerializer  # Usamos el serializer para registro
 
     def post(self, request):
+        print("Datos recibidos:", request.data)  # Imprime los datos para depuración
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()  # Se guarda el usuario y se manda el correo de activación
+            serializer.save()
             return Response({
                 "message": "Usuario creado exitosamente. Por favor, verifica tu correo electrónico para activar tu cuenta."
             }, status=status.HTTP_201_CREATED)
+        print("Errores del serializer:", serializer.errors)  # Imprime errores del serializer
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     
-    
-    
-    
-    # usuarios/views.py
+# usuarios/views.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status

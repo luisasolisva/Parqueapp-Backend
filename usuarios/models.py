@@ -46,7 +46,8 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
 
-    # Campos necesarios para el sistema de permisos
+    password = models.CharField(max_length=255)  # ¡Agrega este campo!
+
     groups = models.ManyToManyField(
         'auth.Group',
         related_name='usuarios_usuario_set',
@@ -65,6 +66,7 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f'{self.nombre} {self.apellido}'
+
 
 
 

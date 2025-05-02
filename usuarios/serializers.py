@@ -28,23 +28,23 @@ class RegisterSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        usuario = Usuario.objects.create_user(
-            email=validated_data['email'],
-            password=validated_data['password'],  # Se asegura de usar set_password correctamente
-            nombre=validated_data['nombre'],
-            apellido=validated_data['apellido'],
-            telefono=validated_data['telefono'],
-            tipo_usuario=validated_data['tipo_usuario'],
-        )
-        usuario.save()
+            usuario = Usuario.objects.create_user(
+                email=validated_data['email'],
+                password=validated_data['password'],  # Se asegura de usar set_password correctamente
+                nombre=validated_data['nombre'],
+                apellido=validated_data['apellido'],
+                telefono=validated_data['telefono'],
+                tipo_usuario=validated_data['tipo_usuario'],
+            )
+            usuario.save()
 
-        # Generar token de activación
-        token = default_token_generator.make_token(usuario)
+            # Generar token de activación
+            token = default_token_generator.make_token(usuario)
 
-        # Llamar a la función send_activation_email importada de utils.py
-        send_activation_email(usuario)
+            # Llamar a la función send_activation_email importada de utils.py
+            send_activation_email(usuario)
 
-        return usuario
+            return usuario
 
 
 
