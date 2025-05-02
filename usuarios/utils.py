@@ -6,6 +6,16 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils.encoding import force_bytes
 
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode
+from django.template.loader import render_to_string
+from django.core.mail import EmailMultiAlternatives
+from django.conf import settings
+from django.utils.encoding import force_bytes
+from django.contrib.auth import get_user_model
+
+Usuario = get_user_model()
+
 def send_activation_email(user):
     # Genera el token
     token = default_token_generator.make_token(user)
@@ -13,19 +23,37 @@ def send_activation_email(user):
     # Codifica el id del usuario
     uid = urlsafe_base64_encode(force_bytes(user.pk))
 
-    # Usar el path de Django para generar la URL de activación
+    # URL de activación
     activation_link = f"http://localhost:8000/api/activar-cuenta/{uid}/{token}/"
 
+    # Asunto del correo
+    subject = "🔹 Activa Tu Cuenta En ParqueApp"
 
-    
-    # Enviar correo electrónico
-    subject = "Activa tu cuenta"
-    message = render_to_string('correo_activacion.html', {
+    # **Versión en HTML**
+    html_content = render_to_string('correo_activacion.html', {
         'user': user,
         'activation_link': activation_link,
     })
-    
-    send_mail(subject, message, settings.EMAIL_HOST_USER, [user.email])
+
+    # **Versión en texto plano (por si el cliente no soporta HTML)**
+    text_content = f"""Hola, {user.nombre} 👋
+
+Bienvenido a ParqueApp, donde puedes reservar tu espacio de estacionamiento fácilmente.
+
+Activa tu cuenta haciendo clic en el siguiente enlace:
+{activation_link}
+
+Si no solicitaste esta cuenta, puedes ignorar este mensaje.
+
+Saludos, 
+El equipo de ParqueApp 🚗
+"""
+
+    # Enviar el correo correctamente
+    email = EmailMultiAlternatives(subject, text_content, settings.EMAIL_HOST_USER, [user.email])
+    email.attach_alternative(html_content, "text/html")
+    email.send()
+
 
 # usuarios/utils.py
 from django.contrib.auth.tokens import default_token_generator
