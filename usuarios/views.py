@@ -116,7 +116,7 @@ class VistaActivacionCuenta(APIView):
                 usuario.save()
                 
                 # **Redirigir al frontend en lugar de mostrar JSON**
-                return redirect(f"{settings.FRONTEND_URL}/confirmacion")
+                return redirect(f"{settings.FRONTEND_URL}/login")
             
             return redirect(f"{settings.FRONTEND_URL}/error")
         
