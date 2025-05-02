@@ -14,7 +14,7 @@ from pathlib import Path
 import os
 from decouple import config
 
-FRONTEND_URL = "http://localhost:3000" 
+FRONTEND_URL = "http://localhost:5173" 
 
 BACKEND_URL = "http://127.0.0.1:8000"
 
