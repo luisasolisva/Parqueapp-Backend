@@ -1,0 +1,177 @@
+
+
+from rest_framework import status
+from rest_framework.generics import GenericAPIView
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
+from .serializers import RegisterSerializer
+
+class RegisterView(GenericAPIView):
+    permission_classes = [AllowAny]
+    serializer_class = RegisterSerializer  # Usamos el serializer para registro
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()  # Se guarda el usuario y se manda el correo de activación
+            return Response({
+                "message": "Usuario creado exitosamente. Por favor, verifica tu correo electrónico para activar tu cuenta."
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    
+    
+    
+    # usuarios/views.py
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .serializers import LoginSerializer
+from django.contrib.auth import login
+from django.contrib.auth.tokens import default_token_generator
+from rest_framework.permissions import AllowAny
+
+class LoginView(APIView):
+    permission_classes = [AllowAny]
+    serializer_class = LoginSerializer  # Aunque no es usado por APIView, no daña
+
+    def post(self, request):
+        # Validar los datos del serializer
+        serializer = LoginSerializer(data=request.data, context={'request': request})  # Pasamos el contexto con el request
+        if serializer.is_valid():
+            # Obtener el usuario validado
+            user = serializer.validated_data['user']
+
+            if user.is_active:
+                # Iniciar sesión
+                login(request, user)
+                
+                # Generar token de autenticación
+                token = default_token_generator.make_token(user)
+                
+                # Redirigir según el tipo de usuario
+                if user.tipo_usuario == 'Admin':
+                    return Response({
+                        "message": "Inicio de sesión exitoso como Administrador.",
+                        "token": token,
+                    }, status=status.HTTP_200_OK)
+                elif user.tipo_usuario == 'Operario':
+                    return Response({
+                        "message": "Inicio de sesión exitoso como Operario.",
+                        "token": token,
+                    }, status=status.HTTP_200_OK) 
+                elif user.tipo_usuario == 'Usuario':
+                    return Response({
+                        "message": "Inicio de sesión exitoso como Usuario.",
+                        "token": token,
+                    }, status=status.HTTP_200_OK) 
+                
+                elif user.tipo_usuario == 'Cliente':
+                    return Response({
+                        "message": "Inicio de sesión exitoso como Cliente.",
+                        "token": token,
+                    }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    "error": "Cuenta inactiva."
+                }, status=status.HTTP_401_UNAUTHORIZED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_decode
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import AllowAny
+from .models import Usuario  # Asegúrate de que estás importando el modelo correcto de Usuario
+
+class VistaActivacionCuenta(APIView):
+    permission_classes = [AllowAny]  # Permitir acceso sin autenticación
+
+    def get(self, request, uidb64, token):
+        try:
+            # Decodificar el UID de base64
+            uid = urlsafe_base64_decode(uidb64).decode('utf-8')
+            usuario = Usuario.objects.get(pk=uid)
+
+            # Verificar si el token es válido
+            if default_token_generator.check_token(usuario, token):
+                usuario.is_active = True
+                usuario.save()
+
+                return Response({
+                    "mensaje": "Cuenta activada exitosamente. Ya puedes iniciar sesión."
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    "error": "El enlace de activación es inválido o ha expirado."
+                }, status=status.HTTP_400_BAD_REQUEST)
+        except (TypeError, ValueError, OverflowError, Usuario.DoesNotExist):
+            return Response({
+                "error": "El enlace de activación es inválido o ha expirado."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+
+
+from rest_framework import status
+from rest_framework.generics import GenericAPIView
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from .serializers import PasswordResetSerializer
+
+class PasswordResetView(GenericAPIView):
+    permission_classes = [AllowAny]
+    serializer_class = PasswordResetSerializer
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()  # Se manda el correo de restablecimiento
+            return Response({
+                "message": "Si ese correo está registrado, te hemos enviado un correo con instrucciones para restablecer tu contraseña."
+            }, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework import status
+from .serializers import PasswordResetConfirmSerializer
+from usuarios.models import Usuario
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = [AllowAny]
+    serializer_class = PasswordResetConfirmSerializer
+
+    def post(self, request, uidb64, token):
+        try:
+            # Decodificar el ID del usuario
+            uid = urlsafe_base64_decode(uidb64).decode()
+            user = Usuario.objects.get(id=uid)
+        except (TypeError, ValueError, OverflowError, Usuario.DoesNotExist):
+            user = None
+
+        # Verificar el token
+        if user is not None and default_token_generator.check_token(user, token):
+            # Validar y guardar la nueva contraseña
+            serializer = self.serializer_class(data=request.data)
+            if serializer.is_valid():
+                serializer.save(user=user)  # Guardamos la nueva contraseña
+                return Response({"message": "Contraseña restablecida con éxito."}, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({"message": "Token inválido o ha expirado."}, status=status.HTTP_400_BAD_REQUEST)
