@@ -1,0 +1,23 @@
+#1 Clonar el Proyecto
+# git clone https://github.com/luisasolisva/Parqueapp-Backend.git develop
+
+#2 Crear el entorno
+# python -m venv venv
+
+#3 Activar el venv
+# Cmd: venv/Scripts/activate 
+# Bash: source venv/Scripts/activate
+
+#4 Instalar la dependencias Requirements
+# (venv): pip install -r requirements.txt
+
+#5 Añadir el .env que debe ser solicitado
+
+#6 Tener Mysql y activarlo
+
+#7 En settings.py buscar Databases y modificar lo que dice ahí
+
+#8 Hacer las migraciones 
+# python manage.py makemigrations
+# python manage.py migrate
+
