@@ -89,39 +89,39 @@ class LoginView(APIView):
     
     
 
+from django.shortcuts import redirect, get_object_or_404
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_decode
-from rest_framework.views import APIView
+from django.conf import settings
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
-from .models import Usuario  # Asegúrate de que estás importando el modelo correcto de Usuario
+from django.contrib.auth import get_user_model
+
+Usuario = get_user_model()
 
 class VistaActivacionCuenta(APIView):
     permission_classes = [AllowAny]  # Permitir acceso sin autenticación
 
     def get(self, request, uidb64, token):
         try:
-            # Decodificar el UID de base64
+            # Decodificar UID y obtener usuario
             uid = urlsafe_base64_decode(uidb64).decode('utf-8')
-            usuario = Usuario.objects.get(pk=uid)
+            usuario = get_object_or_404(Usuario, pk=uid)
 
             # Verificar si el token es válido
             if default_token_generator.check_token(usuario, token):
                 usuario.is_active = True
                 usuario.save()
-
-                return Response({
-                    "mensaje": "Cuenta activada exitosamente. Ya puedes iniciar sesión."
-                }, status=status.HTTP_200_OK)
-            else:
-                return Response({
-                    "error": "El enlace de activación es inválido o ha expirado."
-                }, status=status.HTTP_400_BAD_REQUEST)
-        except (TypeError, ValueError, OverflowError, Usuario.DoesNotExist):
-            return Response({
-                "error": "El enlace de activación es inválido o ha expirado."
-            }, status=status.HTTP_400_BAD_REQUEST)
+                
+                # **Redirigir al frontend en lugar de mostrar JSON**
+                return redirect(f"{settings.FRONTEND_URL}/confirmacion")
+            
+            return redirect(f"{settings.FRONTEND_URL}/error")
+        
+        except Exception:
+            return redirect(f"{settings.FRONTEND_URL}/error")
 
 
 
