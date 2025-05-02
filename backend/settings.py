@@ -101,9 +101,9 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'parqueapp',           #  el nombre de tu base de datos
+        'NAME': 'parqueappdb',           #  el nombre de su base de datos
         'USER': 'root',             # usuario de MySQL
-        'PASSWORD': '12345678',# contraseña de MySQL
+        'PASSWORD': '1234.AppDB',# contraseña de MySQL
         'HOST': 'localhost',
         'PORT': '3306',
     }
