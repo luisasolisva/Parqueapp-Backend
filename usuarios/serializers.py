@@ -28,15 +28,14 @@ class RegisterSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        # Crear el usuario con la contraseña
-        usuario = Usuario.objects.create(
+        usuario = Usuario.objects.create_user(
+            email=validated_data['email'],
+            password=validated_data['password'],  # Se asegura de usar set_password correctamente
             nombre=validated_data['nombre'],
             apellido=validated_data['apellido'],
-            email=validated_data['email'],
             telefono=validated_data['telefono'],
             tipo_usuario=validated_data['tipo_usuario'],
         )
-        usuario.set_password(validated_data['password'])  # Guardar la contraseña cifrada
         usuario.save()
 
         # Generar token de activación
@@ -46,6 +45,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         send_activation_email(usuario)
 
         return usuario
+
 
 
 # usuarios/serializers.py
