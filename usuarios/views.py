@@ -50,12 +50,7 @@ class LoginView(APIView):
                 token = default_token_generator.make_token(user)
                 
                 # Redirigir según el tipo de usuario
-                if user.tipo_usuario == 'Admin':
-                    return Response({
-                        "message": "Inicio de sesión exitoso como Administrador.",
-                        "token": token,
-                    }, status=status.HTTP_200_OK)
-                elif user.tipo_usuario == 'Operario':
+                if user.tipo_usuario == 'Operario':
                     return Response({
                         "message": "Inicio de sesión exitoso como Operario.",
                         "token": token,
@@ -77,17 +72,6 @@ class LoginView(APIView):
                 }, status=status.HTTP_401_UNAUTHORIZED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
 
 from django.shortcuts import redirect, get_object_or_404
 from django.contrib.auth.tokens import default_token_generator
