@@ -1,5 +1,3 @@
-
-
 from rest_framework import status
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
@@ -89,10 +87,6 @@ class VistaActivacionCuenta(APIView):
             return redirect(f"{settings.FRONTEND_URL}/error")
 
 
-
-
-
-
 from rest_framework import status
 from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import AllowAny
@@ -140,3 +134,56 @@ class PasswordResetConfirmView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         return Response({"message": "Token inválido o ha expirado."}, status=status.HTTP_400_BAD_REQUEST)
+
+from rest_framework.permissions import IsAuthenticated
+from .serializers import ClienteStatusSerializer, ClienteUpdateSerializer
+from rest_framework.views import APIView
+from django.shortcuts import get_object_or_404
+
+class ClienteStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, cliente_id):
+        # Verificar que el usuario que hace la petición sea un Operario
+        if request.user.tipo_usuario != 'Operario':
+            return Response(
+                {"error": "Solo los operarios pueden realizar esta acción"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Obtener el cliente
+        cliente = get_object_or_404(Usuario, id=cliente_id, tipo_usuario='Cliente')
+        
+        # Cambiar el estado
+        cliente.is_active = not cliente.is_active
+        cliente.save()
+
+        estado = "activada" if cliente.is_active else "desactivada"
+        return Response({
+            "message": f"Cuenta del cliente {estado} exitosamente",
+            "is_active": cliente.is_active
+        }, status=status.HTTP_200_OK)
+
+class ClienteUpdateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, cliente_id):
+        # Verificar que el usuario que hace la petición sea el mismo cliente o un Operario
+        if request.user.id != cliente_id and request.user.tipo_usuario != 'Operario':
+            return Response(
+                {"error": "No tienes permiso para realizar esta acción"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Obtener el cliente
+        cliente = get_object_or_404(Usuario, id=cliente_id, tipo_usuario='Cliente')
+        
+        # Actualizar los datos
+        serializer = ClienteUpdateSerializer(cliente, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "message": "Datos del cliente actualizados exitosamente",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

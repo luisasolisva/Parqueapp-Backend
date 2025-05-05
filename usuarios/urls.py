@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import PasswordResetView, PasswordResetConfirmView
 from .views import RegisterView, VistaActivacionCuenta
-from .views import LoginView
+from .views import LoginView, ClienteStatusView, ClienteUpdateView
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -15,5 +15,7 @@ urlpatterns = [
     path('token/renovar/', TokenRefreshView.as_view(), name='renovar_token'),
     path('reset-password/<uidb64>/<token>/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('password-reset/', PasswordResetView.as_view(), name='password-reset'),
-    
+    # Nuevas URLs para gestión de clientes
+    path('clientes/<int:cliente_id>/status/', ClienteStatusView.as_view(), name='cliente_status'),
+    path('clientes/<int:cliente_id>/update/', ClienteUpdateView.as_view(), name='cliente_update'),
 ]
