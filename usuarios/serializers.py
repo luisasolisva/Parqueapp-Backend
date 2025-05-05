@@ -48,9 +48,9 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 
-# usuarios/serializers.py
 from rest_framework import serializers
 from django.contrib.auth import authenticate
+from rest_framework_simplejwt.tokens import RefreshToken
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -66,22 +66,16 @@ class LoginSerializer(serializers.Serializer):
         if user is None:
             raise serializers.ValidationError("Credenciales incorrectas.")
         
-        # Devolver el usuario autenticado
-        return {'user': user}
+        # Generar tokens JWT
+        refresh = RefreshToken.for_user(user)
+        access_token = str(refresh.access_token)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+        # Devolver usuario autenticado y tokens
+        return {
+            'user': user,
+            'refresh': str(refresh),
+            'access': access_token,
+        }
 
 
 from django.contrib.auth.tokens import default_token_generator
