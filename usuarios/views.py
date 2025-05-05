@@ -22,55 +22,36 @@ class RegisterView(GenericAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     
-# usuarios/views.py
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.permissions import AllowAny
+from django.contrib.auth import login
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from .serializers import LoginSerializer
-from django.contrib.auth import login
-from django.contrib.auth.tokens import default_token_generator
-from rest_framework.permissions import AllowAny
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
-    serializer_class = LoginSerializer  # Aunque no es usado por APIView, no daña
 
     def post(self, request):
-        # Validar los datos del serializer
-        serializer = LoginSerializer(data=request.data, context={'request': request})  # Pasamos el contexto con el request
+        serializer = LoginSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
-            # Obtener el usuario validado
             user = serializer.validated_data['user']
 
             if user.is_active:
-                # Iniciar sesión
                 login(request, user)
-                
-                # Generar token de autenticación
-                token = default_token_generator.make_token(user)
-                
-                # Redirigir según el tipo de usuario
-                if user.tipo_usuario == 'Operario':
-                    return Response({
-                        "message": "Inicio de sesión exitoso como Operario.",
-                        "token": token,
-                    }, status=status.HTTP_200_OK) 
-                elif user.tipo_usuario == 'Usuario':
-                    return Response({
-                        "message": "Inicio de sesión exitoso como Usuario.",
-                        "token": token,
-                    }, status=status.HTTP_200_OK) 
-                
-                elif user.tipo_usuario == 'Cliente':
-                    return Response({
-                        "message": "Inicio de sesión exitoso como Cliente.",
-                        "token": token,
-                    }, status=status.HTTP_200_OK)
-            else:
+                refresh = RefreshToken.for_user(user)
+
                 return Response({
-                    "error": "Cuenta inactiva."
-                }, status=status.HTTP_401_UNAUTHORIZED)
+                    "message": "Inicio de sesión exitoso.",
+                    "refresh": str(refresh),
+                    "access": str(refresh.access_token),
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "Cuenta inactiva."}, status=status.HTTP_401_UNAUTHORIZED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 from django.shortcuts import redirect, get_object_or_404
