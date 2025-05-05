@@ -1,4 +1,3 @@
-
 from rest_framework import serializers
 import re
 from django.core.mail import send_mail
@@ -138,3 +137,25 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         user.set_password(self.validated_data['password'])
         user.save()
         return user
+
+class ClienteStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Usuario
+        fields = ['is_active']
+        read_only_fields = ['is_active']
+
+class ClienteUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Usuario
+        fields = ['nombre', 'apellido', 'telefono']
+        extra_kwargs = {
+            'nombre': {'required': False},
+            'apellido': {'required': False},
+            'telefono': {'required': False}
+        }
+
+    def validate(self, data):
+        # Validar que al menos un campo sea proporcionado
+        if not any(data.values()):
+            raise serializers.ValidationError("Debe proporcionar al menos un campo para actualizar")
+        return data
