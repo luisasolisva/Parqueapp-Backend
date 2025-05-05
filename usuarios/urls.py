@@ -15,7 +15,7 @@ urlpatterns = [
     path('token/renovar/', TokenRefreshView.as_view(), name='renovar_token'),
     path('reset-password/<uidb64>/<token>/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('password-reset/', PasswordResetView.as_view(), name='password-reset'),
-    # Nuevas URLs para gestión de clientes - Mayk
-    path('clientes/<int:cliente_id>/status/', ClienteStatusView.as_view(), name='cliente_status'), # Desactivar/activar cuenta de cliente
-    path('clientes/<int:cliente_id>/update/', ClienteUpdateView.as_view(), name='cliente_update'), # Actualizar datos de cliente
+    # URLs actualizadas para gestión de clientes usando uidb64
+    path('clientes/<uidb64>/status/', ClienteStatusView.as_view(), name='cliente_status'),
+    path('clientes/<uidb64>/update/', ClienteUpdateView.as_view(), name='cliente_update'),
 ]

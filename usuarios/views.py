@@ -162,7 +162,7 @@ from django.shortcuts import get_object_or_404
 class ClienteStatusView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, cliente_id):
+    def post(self, request, uidb64):
         # Verificar que el usuario que hace la petición sea un Operario
         if request.user.tipo_usuario != 'Operario':
             return Response(
@@ -170,8 +170,15 @@ class ClienteStatusView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # Obtener el cliente
-        cliente = get_object_or_404(Usuario, id=cliente_id, tipo_usuario='Cliente')
+        try:
+            # Decodificar el uidb64 para obtener el ID del usuario
+            uid = urlsafe_base64_decode(uidb64).decode()
+            cliente = get_object_or_404(Usuario, id=uid, tipo_usuario='Cliente')
+        except (TypeError, ValueError, OverflowError, Usuario.DoesNotExist):
+            return Response(
+                {"error": "Cliente no encontrado"},
+                status=status.HTTP_404_NOT_FOUND
+            )
         
         # Cambiar el estado
         cliente.is_active = not cliente.is_active
@@ -186,16 +193,23 @@ class ClienteStatusView(APIView):
 class ClienteUpdateView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def put(self, request, cliente_id):
+    def put(self, request, uidb64):
+        try:
+            # Decodificar el uidb64 para obtener el ID del usuario
+            uid = urlsafe_base64_decode(uidb64).decode()
+            cliente = get_object_or_404(Usuario, id=uid, tipo_usuario='Cliente')
+        except (TypeError, ValueError, OverflowError, Usuario.DoesNotExist):
+            return Response(
+                {"error": "Cliente no encontrado"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
         # Verificar que el usuario que hace la petición sea el mismo cliente o un Operario
-        if request.user.id != cliente_id and request.user.tipo_usuario != 'Operario':
+        if request.user.id != cliente.id and request.user.tipo_usuario != 'Operario':
             return Response(
                 {"error": "No tienes permiso para realizar esta acción"},
                 status=status.HTTP_403_FORBIDDEN
             )
-
-        # Obtener el cliente
-        cliente = get_object_or_404(Usuario, id=cliente_id, tipo_usuario='Cliente')
         
         # Actualizar los datos
         serializer = ClienteUpdateSerializer(cliente, data=request.data, partial=True)
