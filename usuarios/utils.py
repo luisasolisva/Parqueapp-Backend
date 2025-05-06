@@ -1,12 +1,4 @@
 from django.contrib.auth.tokens import default_token_generator
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from django.template.loader import render_to_string
-from django.core.mail import send_mail
-from django.conf import settings
-from django.contrib.auth.models import User
-from django.utils.encoding import force_bytes
-
-from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode
 from django.template.loader import render_to_string
 from django.core.mail import EmailMultiAlternatives
@@ -26,33 +18,31 @@ def send_activation_email(user):
     # URL de activación
     activation_link = f"http://localhost:8000/api/activar-cuenta/{uid}/{token}/"
 
-    # Asunto del correo
-    subject = "🔹 Activa Tu Cuenta En ParqueApp"
+    # Determinar la plantilla según el tipo de usuario
+    if user.tipo_usuario == "cliente":
+        subject = "🔹 Activa Tu Cuenta De Cliente En ParqueApp"
+        template = "correo_activacion_cliente.html"
+    
+    elif user.tipo_usuario == "operario":
+        subject = "🔹 Tu Cuenta De Operario Está Lista 🛠️"
+        template = "correo_activacion_operario.html"
+    
+    else:
+        subject = "🔹 Bienvenido a ParqueApp 👋"
+        template = "correo_activacion_usuario.html"
 
-    # **Versión en HTML**
-    html_content = render_to_string('correo_activacion.html', {
+    # Generar contenido en HTML
+    html_content = render_to_string(template, {
         'user': user,
         'activation_link': activation_link,
     })
 
-    # **Versión en texto plano (por si el cliente no soporta HTML)**
-    text_content = f"""Hola, {user.nombre} 👋
-
-Bienvenido a ParqueApp, donde puedes reservar tu espacio de estacionamiento fácilmente.
-
-Activa tu cuenta haciendo clic en el siguiente enlace:
-{activation_link}
-
-Si no solicitaste esta cuenta, puedes ignorar este mensaje.
-
-Saludos, 
-El equipo de ParqueApp 🚗
-"""
-
     # Enviar el correo correctamente
-    email = EmailMultiAlternatives(subject, text_content, settings.EMAIL_HOST_USER, [user.email])
+    email = EmailMultiAlternatives(subject, html_content, settings.EMAIL_HOST_USER, [user.email])
     email.attach_alternative(html_content, "text/html")
     email.send()
+
+
 
 
 # usuarios/utils.py
