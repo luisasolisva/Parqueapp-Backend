@@ -19,11 +19,11 @@ def send_activation_email(user):
     activation_link = f"http://localhost:8000/api/activar-cuenta/{uid}/{token}/"
 
     # Determinar la plantilla según el tipo de usuario
-    if user.tipo_usuario == "cliente":
+    if user.tipo_usuario == "Cliente":
         subject = "🔹 Activa Tu Cuenta De Cliente En ParqueApp"
         template = "correo_activacion_cliente.html"
     
-    elif user.tipo_usuario == "operario":
+    elif user.tipo_usuario == "Operario":
         subject = "🔹 Tu Cuenta De Operario Está Lista 🛠️"
         template = "correo_activacion_operario.html"
     
