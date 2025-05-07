@@ -1,0 +1,9 @@
+<form method="POST" action="/api/verify-reset-code/">
+    {% csrf_token %}
+    <label for="email">Email:</label>
+    <input type="email" name="email" required>
+    <label for="code">Código:</label>
+    <input type="text" name="code" required maxlength="4">
+    <button type="submit">Verificar código</button>
+  </form>
+  

@@ -77,62 +77,6 @@ class LoginSerializer(serializers.Serializer):
             'access': access_token,
         }
 
-
-from django.contrib.auth.tokens import default_token_generator
-from usuarios.models import Usuario
-from rest_framework import serializers
-
-from rest_framework import serializers
-from usuarios.models import Usuario
-from django.contrib.auth.tokens import default_token_generator
-from .utils import send_password_reset_email
-
-class PasswordResetSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-
-    def validate_email(self, value):
-        # Validar si el usuario existe utilizando el modelo personalizado
-        if not Usuario.objects.filter(email=value).exists():
-            raise serializers.ValidationError("No se encontró un usuario con ese correo electrónico.")
-        return value
-
-    def save(self):
-        # Obtener el usuario con el email validado
-        email = self.validated_data['email']
-        user = Usuario.objects.get(email=email)
-        
-        # Generar el token de restablecimiento
-        token = default_token_generator.make_token(user)
-        
-        # Enviar el correo con el enlace de restablecimiento
-        send_password_reset_email(user, token)
-
-
-
-
-
-
-from django.contrib.auth.password_validation import validate_password
-from rest_framework import serializers
-from usuarios.models import Usuario
-
-class PasswordResetConfirmSerializer(serializers.Serializer):
-    password = serializers.CharField(write_only=True)
-
-    def validate_password(self, value):
-        # Validar que la contraseña cumpla con las políticas de seguridad de Django
-        try:
-            validate_password(value)
-        except Exception as e:
-            raise serializers.ValidationError(str(e))
-        return value
-
-    def save(self, user):
-        # Guardar la nueva contraseña
-        user.set_password(self.validated_data['password'])
-        user.save()
-        return user
-
 class ClienteStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = Usuario
@@ -154,3 +98,83 @@ class ClienteUpdateSerializer(serializers.ModelSerializer):
         if not any(data.values()):
             raise serializers.ValidationError("Debe proporcionar al menos un campo para actualizar")
         return data
+
+
+
+from rest_framework import serializers
+from django.utils import timezone
+from datetime import timedelta
+from usuarios.models import Usuario
+from usuarios.utils import send_password_reset_email
+import random
+
+class PasswordResetSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        if not Usuario.objects.filter(email=value).exists():
+            raise serializers.ValidationError("No se encontró un usuario con ese correo electrónico.")
+        return value
+
+    def save(self):
+        email = self.validated_data['email']
+        user = Usuario.objects.get(email=email)
+
+        code = str(random.randint(1000, 9999))
+        user.codigo_restauracion = code
+        user.codigo_creado = timezone.now()
+        user.codigo_validado = False
+        user.save()
+
+        send_password_reset_email(user, code)
+
+
+class PasswordResetCodeConfirmSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    code = serializers.CharField(max_length=4)
+
+    def validate(self, data):
+        try:
+            user = Usuario.objects.get(email=data['email'])
+        except Usuario.DoesNotExist:
+            raise serializers.ValidationError("Usuario no encontrado.")
+
+        if user.codigo_restauracion != data['code']:
+            raise serializers.ValidationError("Código incorrecto.")
+
+        if not user.codigo_creado or timezone.now() - user.codigo_creado > timedelta(minutes=10):
+            raise serializers.ValidationError("El código ha expirado.")
+
+        user.codigo_validado = True
+        user.save()
+
+        return data
+
+
+from rest_framework import serializers
+from usuarios.models import Usuario
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, min_length=8)
+    password_confirm = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        if data['password'] != data['password_confirm']:
+            raise serializers.ValidationError("Las contraseñas no coinciden.")
+        return data
+
+    def save(self):
+        try:
+            user = Usuario.objects.get(email=self.validated_data['email'])
+        except Usuario.DoesNotExist:
+            raise serializers.ValidationError("No se encontró un usuario con ese correo electrónico.")
+
+        if not user.codigo_validado:
+            raise serializers.ValidationError("Primero debes validar tu código.")
+
+        user.set_password(self.validated_data['password'])
+        user.codigo_restauracion = None
+        user.codigo_creado = None
+        user.codigo_validado = False
+        user.save()

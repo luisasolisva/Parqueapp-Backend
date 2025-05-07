@@ -87,53 +87,7 @@ class VistaActivacionCuenta(APIView):
             return redirect(f"{settings.FRONTEND_URL}/error")
 
 
-from rest_framework import status
-from rest_framework.generics import GenericAPIView
-from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
-from .serializers import PasswordResetSerializer
 
-class PasswordResetView(GenericAPIView):
-    permission_classes = [AllowAny]
-    serializer_class = PasswordResetSerializer
-
-    def post(self, request):
-        serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()  # Se manda el correo de restablecimiento
-            return Response({
-                "message": "Si ese correo está registrado, te hemos enviado un correo con instrucciones para restablecer tu contraseña."
-            }, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from rest_framework import status
-from .serializers import PasswordResetConfirmSerializer
-from usuarios.models import Usuario
-
-class PasswordResetConfirmView(APIView):
-    permission_classes = [AllowAny]
-    serializer_class = PasswordResetConfirmSerializer
-
-    def post(self, request, uidb64, token):
-        try:
-            # Decodificar el ID del usuario
-            uid = urlsafe_base64_decode(uidb64).decode()
-            user = Usuario.objects.get(id=uid)
-        except (TypeError, ValueError, OverflowError, Usuario.DoesNotExist):
-            user = None
-
-        # Verificar el token
-        if user is not None and default_token_generator.check_token(user, token):
-            # Validar y guardar la nueva contraseña
-            serializer = self.serializer_class(data=request.data)
-            if serializer.is_valid():
-                serializer.save(user=user)  # Guardamos la nueva contraseña
-                return Response({"message": "Contraseña restablecida con éxito."}, status=status.HTTP_200_OK)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        return Response({"message": "Token inválido o ha expirado."}, status=status.HTTP_400_BAD_REQUEST)
 
 from rest_framework.permissions import IsAuthenticated
 from .serializers import ClienteStatusSerializer, ClienteUpdateSerializer
@@ -201,3 +155,52 @@ class ClienteUpdateView(APIView):
                 "data": serializer.data
             }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
+from rest_framework import status
+from .serializers import (
+    PasswordResetSerializer,
+    PasswordResetCodeConfirmSerializer,
+    PasswordResetConfirmSerializer
+)
+class SendResetCodeView(APIView):
+    permission_classes = [AllowAny]
+
+    def get_serializer(self, *args, **kwargs):
+        return PasswordResetSerializer(*args, **kwargs)
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"message": "Código enviado al correo si el usuario existe."}, status=status.HTTP_200_OK)
+
+
+
+class VerifyResetCodeView(APIView):
+    permission_classes = [AllowAny]
+
+    def get_serializer(self, *args, **kwargs):
+        return PasswordResetCodeConfirmSerializer(*args, **kwargs)
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response({"message": "Código verificado. Ahora puedes cambiar tu contraseña."}, status=status.HTTP_200_OK)
+
+
+class ResetPasswordView(APIView):
+    permission_classes = [AllowAny]
+
+    def get_serializer(self, *args, **kwargs):
+        return PasswordResetConfirmSerializer(*args, **kwargs)
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"message": "Contraseña restablecida con éxito."}, status=status.HTTP_200_OK)
