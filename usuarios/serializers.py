@@ -48,9 +48,11 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 
+from django.contrib.auth import authenticate, get_user_model
 from rest_framework import serializers
-from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
+
+User = get_user_model()
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -60,26 +62,33 @@ class LoginSerializer(serializers.Serializer):
         email = data.get('email')
         password = data.get('password')
 
-        # Autenticación del usuario
-        user = authenticate(request=self.context.get('request'), username=email, password=password)
-        
-        if user is None:
-            raise serializers.ValidationError("El correo o la contraseña no son correctos. Verifica e intenta nuevamente.")
-        
-        # Verificar si el usuario está activo
+        # Buscar al usuario en la base de datos
+        user = User.objects.filter(email=email).first()
+
+        if not user:
+            raise serializers.ValidationError({"error": "El correo o la contraseña no son correctos. Verifica e intenta nuevamente."})
+
+        # Verificar si el usuario está inactivo antes de autenticarse
         if not user.is_active:
-            raise serializers.ValidationError("Tu cuenta está inactiva. Contacta al soporte para más información.")
+            raise serializers.ValidationError({"error": "Tu cuenta está inactiva. Contacta al soporte para más información."})
+
+        # Ahora sí autenticamos
+        user = authenticate(request=self.context.get('request'), username=email, password=password)
+
+        if user is None:
+            raise serializers.ValidationError({"error": "El correo o la contraseña no son correctos. Verifica e intenta nuevamente."})
 
         # Generar tokens JWT
         refresh = RefreshToken.for_user(user)
         access_token = str(refresh.access_token)
 
-        # Devolver usuario autenticado y tokens
         return {
             'user': user,
             'refresh': str(refresh),
             'access': access_token,
         }
+
+
 
 class ClienteStatusSerializer(serializers.ModelSerializer):
     class Meta:
