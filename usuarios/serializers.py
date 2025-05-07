@@ -64,8 +64,12 @@ class LoginSerializer(serializers.Serializer):
         user = authenticate(request=self.context.get('request'), username=email, password=password)
         
         if user is None:
-            raise serializers.ValidationError("Credenciales incorrectas.")
+            raise serializers.ValidationError("El correo o la contraseña no son correctos. Verifica e intenta nuevamente.")
         
+        # Verificar si el usuario está activo
+        if not user.is_active:
+            raise serializers.ValidationError("Tu cuenta está inactiva. Contacta al soporte para más información.")
+
         # Generar tokens JWT
         refresh = RefreshToken.for_user(user)
         access_token = str(refresh.access_token)
