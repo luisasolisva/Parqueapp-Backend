@@ -45,6 +45,7 @@ class LoginView(APIView):
                     "message": "Inicio de sesión exitoso.",
                     "refresh": str(refresh),
                     "access": str(refresh.access_token),
+                    "tipo_usuario": user.tipo_usuario,
                 }, status=status.HTTP_200_OK)
             else:
                 return Response({"error": "Cuenta inactiva."}, status=status.HTTP_401_UNAUTHORIZED)
