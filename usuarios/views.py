@@ -36,19 +36,16 @@ class LoginView(APIView):
         serializer = LoginSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             user = serializer.validated_data['user']
+            login(request, user)
+            refresh = RefreshToken.for_user(user)
 
-            if user.is_active:
-                login(request, user)
-                refresh = RefreshToken.for_user(user)
+            return Response({
+                "message": "Inicio de sesión exitoso.",
+                "refresh": str(refresh),
+                "access": str(refresh.access_token),
+                "tipo_usuario": user.tipo_usuario,
+            }, status=status.HTTP_200_OK)
 
-                return Response({
-                    "message": "Inicio de sesión exitoso.",
-                    "refresh": str(refresh),
-                    "access": str(refresh.access_token),
-                    "tipo_usuario": user.tipo_usuario,
-                }, status=status.HTTP_200_OK)
-            else:
-                return Response({"error": "Cuenta inactiva."}, status=status.HTTP_401_UNAUTHORIZED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
