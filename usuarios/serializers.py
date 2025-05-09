@@ -15,18 +15,6 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = Usuario
         fields = ['nombre', 'apellido', 'email', 'telefono', 'tipo_usuario', 'password']
 
-    def validate_password(self, value):
-        """ Verifica que la contraseña cumpla con los requisitos de seguridad. """
-        if len(value) < 8:
-            raise serializers.ValidationError("La contraseña debe tener al menos 8 caracteres.")
-        if not re.search(r'[A-Z]', value):
-            raise serializers.ValidationError("La contraseña debe incluir al menos una letra mayúscula.")
-        if not re.search(r'[0-9]', value):
-            raise serializers.ValidationError("La contraseña debe incluir al menos un número.")
-        if not re.search(r'[\W_]', value):
-            raise serializers.ValidationError("La contraseña debe incluir al menos un carácter especial (@, #, !, etc.).")
-        return value
-
     def create(self, validated_data):
             usuario = Usuario.objects.create_user(
                 email=validated_data['email'],
