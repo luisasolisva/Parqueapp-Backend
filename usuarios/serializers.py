@@ -141,18 +141,13 @@ class PasswordResetSerializer(serializers.Serializer):
 
         send_password_reset_email(user, code)
 
-
 class PasswordResetCodeConfirmSerializer(serializers.Serializer):
-    email = serializers.EmailField()
     code = serializers.CharField(max_length=4)
 
     def validate(self, data):
         try:
-            user = Usuario.objects.get(email=data['email'])
+            user = Usuario.objects.get(codigo_restauracion=data['code'])
         except Usuario.DoesNotExist:
-            raise serializers.ValidationError("Usuario no encontrado.")
-
-        if user.codigo_restauracion != data['code']:
             raise serializers.ValidationError("Código incorrecto.")
 
         if not user.codigo_creado or timezone.now() - user.codigo_creado > timedelta(minutes=10):
@@ -162,6 +157,7 @@ class PasswordResetCodeConfirmSerializer(serializers.Serializer):
         user.save()
 
         return data
+
 
 
 from rest_framework import serializers
