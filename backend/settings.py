@@ -217,3 +217,7 @@ EMAIL_HOST_USER = 'parqueappreservas@gmail.com'
 EMAIL_HOST_PASSWORD = 'lbcr wpay znje qotm'  # Esta es una app password, así que está bien usarla
 
 AUTH_USER_MODEL = 'usuarios.Usuario'  # Usa el nombre correcto de tu app
+
+
+TIME_ZONE = 'America/Bogota'  # Zona horaria de Colombia
+USE_TZ = True

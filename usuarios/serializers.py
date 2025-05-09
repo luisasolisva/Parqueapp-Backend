@@ -153,6 +153,10 @@ class PasswordResetCodeConfirmSerializer(serializers.Serializer):
 
 from rest_framework import serializers
 from usuarios.models import Usuario
+from rest_framework import serializers
+from usuarios.models import Usuario
+from django.utils import timezone
+from datetime import timedelta
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -160,21 +164,31 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     password_confirm = serializers.CharField(write_only=True)
 
     def validate(self, data):
+        # Verifica que las contraseñas coincidan
         if data['password'] != data['password_confirm']:
             raise serializers.ValidationError("Las contraseñas no coinciden.")
         return data
 
     def save(self):
         try:
+            # Obtén el usuario con el correo proporcionado
             user = Usuario.objects.get(email=self.validated_data['email'])
         except Usuario.DoesNotExist:
             raise serializers.ValidationError("No se encontró un usuario con ese correo electrónico.")
 
+        # Verifica si el código ha sido validado
         if not user.codigo_validado:
-            raise serializers.ValidationError("Primero debes validar tu código.")
+            raise serializers.ValidationError("Primero debes validar tu código de restauración.")
 
+        # Verifica si el código ha expirado
+        if timezone.now() - user.codigo_creado > timedelta(minutes=10):
+            raise serializers.ValidationError("El código ha expirado. Solicita uno nuevo.")
+
+        # Establece la nueva contraseña
         user.set_password(self.validated_data['password'])
-        user.codigo_restauracion = None
-        user.codigo_creado = None
-        user.codigo_validado = False
+        user.codigo_restauracion = None  # Limpia el código de restauración
+        user.codigo_creado = None  # Limpia la fecha de creación del código
+        user.codigo_validado = False  # Reinicia el estado de validación
+
+        # Guarda el usuario con la nueva contraseña
         user.save()

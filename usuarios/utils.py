@@ -57,34 +57,40 @@ def generar_enlace_activacion(usuario):
     # Retornar el enlace completo
     return f"http://localhost:8000/api/activar-cuenta/{uidb64}/{token}/"
 
-
-
-
-
-
-
-
 from django.core.mail import send_mail
 from django.conf import settings
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode
 from django.template.loader import render_to_string
 from django.urls import reverse
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.utils.http import urlsafe_base64_encode
+from django.urls import reverse
+from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.utils.http import urlsafe_base64_encode
+from django.urls import reverse
+from django.conf import settings
 
-def send_password_reset_email(user, token):
-    # Convertir el UUID a string y luego a bytes
-    user_id_str = str(user.pk)  # Convierte el UUID a string
-    user_id_bytes = user_id_str.encode('utf-8')  # Luego lo conviertes a bytes
+def send_password_reset_email(user, code):
+    # Convertir el ID del usuario
+    uid = urlsafe_base64_encode(str(user.pk).encode('utf-8'))
 
-    # Crear el enlace para el restablecimiento de contraseña
-    
-    uid = urlsafe_base64_encode(str(user.pk).encode())
-    reset_url = f"{settings.BACKEND_URL}{reverse('password_reset_confirm', kwargs={'uidb64': uid, 'token': token})}"
-    
+    # Crear el enlace para verificar el código
+    verify_url = f"{settings.BACKEND_URL}{reverse('verify_reset_code')}"
+
+
     subject = "Restablece tu contraseña"
-    message = render_to_string('password_reset_email.html', {
+
+    # Aquí generas el contenido HTML con el botón y los datos del usuario
+    html_content = render_to_string('password_reset_email_code.html', {
         'user': user,
-        'reset_url': reset_url,
+        'code': code,
+        'verify_url': verify_url,
     })
 
-    send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email])
+    # Crear el correo con HTML
+    msg = EmailMultiAlternatives(subject, '', settings.DEFAULT_FROM_EMAIL, [user.email])
+    msg.attach_alternative(html_content, "text/html")
+    msg.send()
