@@ -188,9 +188,9 @@ class VerifyResetCodeView(APIView):
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        return Response({"message": "Código verificado. Ahora puedes cambiar tu contraseña."}, status=status.HTTP_200_OK)
 
-
+        # Extraer el `user_id` validado
+        return Response({"message": "Código verificado. Ahora puedes cambiar tu contraseña.", "user_id": serializer.validated_data['user_id']}, status=status.HTTP_200_OK)
 
 
 class ResetPasswordView(APIView):
@@ -200,11 +200,10 @@ class ResetPasswordView(APIView):
         return PasswordResetConfirmSerializer(*args, **kwargs)
 
     def post(self, request):
-        # Obtén el serializer y valida la información
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # Guarda los datos (restablece la contraseña si todo es válido)
+        # Guarda la nueva contraseña
         serializer.save()
 
         return Response({"message": "Contraseña restablecida con éxito."}, status=status.HTTP_200_OK)
