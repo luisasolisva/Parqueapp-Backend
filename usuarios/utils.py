@@ -77,17 +77,12 @@ def send_password_reset_email(user, code):
     # Convertir el ID del usuario
     uid = urlsafe_base64_encode(str(user.pk).encode('utf-8'))
 
-    # Crear el enlace para verificar el código
-    verify_url = f"{settings.BACKEND_URL}{reverse('verify_reset_code')}"
-
-
-    subject = "Restablece tu contraseña"
+    subject = "Código De Verificación Para Restablecer Tu Contraseña"
 
     # Aquí generas el contenido HTML con el botón y los datos del usuario
     html_content = render_to_string('password_reset_email_code.html', {
         'user': user,
         'code': code,
-        'verify_url': verify_url,
     })
 
     # Crear el correo con HTML
