@@ -138,13 +138,16 @@ class PasswordResetCodeConfirmSerializer(serializers.Serializer):
         except Usuario.DoesNotExist:
             raise serializers.ValidationError("Código incorrecto.")
 
+        # Verificar expiración del código
         if not user.codigo_creado or timezone.now() - user.codigo_creado > timedelta(minutes=10):
             raise serializers.ValidationError("El código ha expirado.")
 
         user.codigo_validado = True
         user.save()
 
-        return data
+        # Retornar el ID del usuario para que el frontend lo almacene
+        return {"user_id": user.id}
+
 
 
 
