@@ -159,7 +159,7 @@ from django.utils import timezone
 from datetime import timedelta
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
-    user_id = serializers.IntegerField()
+    user_id = serializers.UUIDField()
     password = serializers.CharField(write_only=True, min_length=8)
     password_confirm = serializers.CharField(write_only=True)
 
