@@ -14,10 +14,13 @@ from pathlib import Path
 import os
 from decouple import config
 
-FRONTEND_URL = "http://localhost:5173" 
+# DEVELOP
+# FRONTEND_URL = "http://localhost:5173" 
+# BACKEND_URL = "http://127.0.0.1:8000"
 
-BACKEND_URL = "http://127.0.0.1:8000"
-
+# PRODUCTION
+FRONTEND_URL = "http://parqueapp.eleueleo.com" 
+BACKEND_URL = "http://parqueapp.eleueleo.com/api"
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -30,7 +33,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-wepj7d-(spdlkf=vxh%@3m0kk#4&i5a_anwfyhz0h-69x-2s35'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = []
 
