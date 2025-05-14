@@ -5,18 +5,19 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from .models import Reserva, Parqueadero, EspacioParqueadero
+from usuarios.models import Reserva
+from rest_framework.permissions import AllowAny
+
+
+
+from rest_framework.generics import CreateAPIView
+from rest_framework.permissions import IsAuthenticated
+
 from .serializers import ReservaSerializer
 
-class CrearReservaView(APIView):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+class CrearReservaView(CreateAPIView):
+    serializer_class = ReservaSerializer
+    permission_classes = [AllowAny]
 
-    def post(self, request):
-        user = request.user  # Usuario autenticado
-
-        serializer = ReservaSerializer(data=request.data, context={"request": request})
-        if serializer.is_valid():
-            serializer.save(id_usuario=user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def perform_create(self, serializer):
+        serializer.save(id_usuario=self.request.user)

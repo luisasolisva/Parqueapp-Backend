@@ -83,7 +83,7 @@ class Parqueadero(models.Model):
     capacidad_total = models.IntegerField()
     capacidad_disponible = models.IntegerField()
     precio_hora = models.DecimalField(max_digits=10, decimal_places=2)
-    id_propietario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    id_propietario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='parqueadero_set_usuarios')
 
     def __str__(self):
         return self.nombre
