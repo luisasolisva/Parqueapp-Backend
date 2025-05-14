@@ -35,7 +35,13 @@ SECRET_KEY = 'django-insecure-wepj7d-(spdlkf=vxh%@3m0kk#4&i5a_anwfyhz0h-69x-2s35
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = []
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost").split(",")
+
 
 
 # Application definition
