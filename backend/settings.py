@@ -15,12 +15,12 @@ import os
 from decouple import config
 
 # DEVELOP
-# FRONTEND_URL = "http://localhost:5173" 
-# BACKEND_URL = "http://127.0.0.1:8000"
+FRONTEND_URL = "http://localhost:5173" 
+BACKEND_URL = "http://127.0.0.1:8000"
 
 # PRODUCTION
-FRONTEND_URL = "http://parqueapp.eleueleo.com" 
-BACKEND_URL = "http://parqueapp.eleueleo.com/api"
+# FRONTEND_URL = "http://parqueapp.eleueleo.com" 
+# BACKEND_URL = "http://parqueapp.eleueleo.com/api"
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -35,13 +35,16 @@ SECRET_KEY = 'django-insecure-wepj7d-(spdlkf=vxh%@3m0kk#4&i5a_anwfyhz0h-69x-2s35
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-import os
-from dotenv import load_dotenv
+ALLOWED_HOSTS = ["parqueapp.eleueleo.com", "127.0.0.1", "localhost"]
 
-load_dotenv()
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost").split(",")
-
+SECURE_SSL_REDIRECT = True  # Redirige todas las solicitudes HTTP a HTTPS
+SESSION_COOKIE_SECURE = True  # Asegura que las cookies de sesión solo se envíen por HTTPS
+CSRF_COOKIE_SECURE = True  # Asegura que las cookies CSRF solo se envíen por HTTPS
+SECURE_HSTS_SECONDS = 31536000  # Habilita HTTP Strict Transport Security (HSTS) por un año
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True  # Aplica HSTS a subdominios
+SECURE_HSTS_PRELOAD = True  # Permite que el sitio se incluya en la lista de precarga HSTS
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # Indica que la solicitud proviene de HTTPS
 
 
 # Application definition
@@ -127,6 +130,20 @@ DATABASES = {
         'PORT': '3306',
     }
 }
+
+
+# PRODUCTION
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': 'parqueappdb',           #  el nombre de su base de datos
+#         'USER': 'parqueapp',             # usuario de MySQL
+#         'PASSWORD': '1234.AppDB',# contraseña de MySQL
+#         'HOST': 'localhost',
+#         'PORT': '3306',
+#     }
+# }
+
 
 # Password validation
 # https://docs.djang  oproject.com/en/5.2/ref/settings/#auth-password-validators
