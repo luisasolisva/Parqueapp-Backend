@@ -39,7 +39,9 @@ class RegisterSerializer(serializers.ModelSerializer):
 from django.contrib.auth import authenticate, get_user_model
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
+from .utils import send_activation_email  # Asegúrate de importar la función correctamente
 
+from django.contrib.auth import get_user_model
 User = get_user_model()
 
 class LoginSerializer(serializers.Serializer):
@@ -50,23 +52,23 @@ class LoginSerializer(serializers.Serializer):
         email = data.get('email')
         password = data.get('password')
 
-        # Buscar al usuario en la base de datos
         user = User.objects.filter(email=email).first()
 
         if not user:
             raise serializers.ValidationError({"error": "El correo o la contraseña no son correctos. Verifica e intenta nuevamente."})
 
-        # Verificar si el usuario está inactivo antes de autenticarse
         if not user.is_active:
-            raise serializers.ValidationError({"error": "Tu cuenta está inactiva. Contacta al soporte para más información."})
+            # Reenviar correo de activación
+            send_activation_email(user)
+            raise serializers.ValidationError({
+                "error": "Tu cuenta aún no ha sido activada. Te hemos enviado nuevamente un correo de activación."
+            })
 
-        # Ahora sí autenticamos
         user = authenticate(request=self.context.get('request'), username=email, password=password)
 
         if user is None:
             raise serializers.ValidationError({"error": "El correo o la contraseña no son correctos. Verifica e intenta nuevamente."})
 
-        # Generar tokens JWT
         refresh = RefreshToken.for_user(user)
         access_token = str(refresh.access_token)
 
@@ -75,6 +77,7 @@ class LoginSerializer(serializers.Serializer):
             'refresh': str(refresh),
             'access': access_token,
         }
+
 
 
 
