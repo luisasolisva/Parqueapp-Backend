@@ -38,6 +38,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'channels',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -112,9 +113,9 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'parqueapp',           #  el nombre de su base de datos
+        'NAME': 'parqueos',           #  el nombre de su base de datos
         'USER': 'root',             # usuario de MySQL
-        'PASSWORD': '12345678',# contraseña de MySQL
+        'PASSWORD': '1318',# contraseña de MySQL
         'HOST': 'localhost',
         'PORT': '3306',
     }
@@ -232,3 +233,16 @@ AUTH_USER_MODEL = 'usuarios.Usuario'  # Usa el nombre correcto de tu app
 
 TIME_ZONE = 'America/Bogota'  # Zona horaria de Colombia
 USE_TZ = True
+
+ASGI_APPLICATION = 'backend.asgi.application'  
+
+
+# Configuración simple para channel layers usando Redis (recomendado)
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
+    }
+}
+
+
+SECRET_KEY = config('SECRET_KEY')
