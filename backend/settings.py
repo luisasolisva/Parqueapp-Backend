@@ -32,19 +32,29 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-wepj7d-(spdlkf=vxh%@3m0kk#4&i5a_anwfyhz0h-69x-2s35'
 
+#--NO TOCAR
+#SOLO ACTIVAR EN PRODUCCION[
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+# DEBUG = False
 
-ALLOWED_HOSTS = ["parqueapp.eleueleo.com", "127.0.0.1", "localhost"]
+# ALLOWED_HOSTS = ["parqueapp.eleueleo.com", "127.0.0.1", "localhost"]
 
+# SECURE_SSL_REDIRECT = True  # Redirige todas las solicitudes HTTP a HTTPS
+# SESSION_COOKIE_SECURE = True  # Asegura que las cookies de sesión solo se envíen por HTTPS
+# CSRF_COOKIE_SECURE = True  # Asegura que las cookies CSRF solo se envíen por HTTPS
+# SECURE_HSTS_SECONDS = 31536000  # Habilita HTTP Strict Transport Security (HSTS) por un año
+# SECURE_HSTS_INCLUDE_SUBDOMAINS = True  # Aplica HSTS a subdominios
+# SECURE_HSTS_PRELOAD = True  # Permite que el sitio se incluya en la lista de precarga HSTS
+# SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # Indica que la solicitud proviene de HTTPS
+#]
 
-SECURE_SSL_REDIRECT = True  # Redirige todas las solicitudes HTTP a HTTPS
-SESSION_COOKIE_SECURE = True  # Asegura que las cookies de sesión solo se envíen por HTTPS
-CSRF_COOKIE_SECURE = True  # Asegura que las cookies CSRF solo se envíen por HTTPS
-SECURE_HSTS_SECONDS = 31536000  # Habilita HTTP Strict Transport Security (HSTS) por un año
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True  # Aplica HSTS a subdominios
-SECURE_HSTS_PRELOAD = True  # Permite que el sitio se incluya en la lista de precarga HSTS
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # Indica que la solicitud proviene de HTTPS
+#Solo en Desarrollo
+DEBUG = True
+ALLOWED_HOSTS = []
+SECURE_SSL_REDIRECT = False  # Redirige todas las solicitudes HTTP
+SESSION_COOKIE_SECURE = False  # Asegura que las cookies de sesión solo se envíen por HTTP
+CSRF_COOKIE_SECURE = False  # Asegura que las cookies CSRF solo se envíen por HTTP
+
 
 
 # Application definition
