@@ -9,4 +9,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('usuarios.urls')),
     path('accounts/', include('allauth.urls')),
+    path('api/parqueadero/', include('parqueadero.urls')),
+    path('parqueaderos/', include('parqueadero.urls'))
+
 ]
