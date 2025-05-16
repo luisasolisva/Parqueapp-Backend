@@ -13,10 +13,14 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 from django.utils import timezone
 
 TIPO_USUARIO_CHOICES = [
+    #Quien Reserva
     ('Cliente', 'Cliente'),
+    #Quien Admin Del Parqueadero
     ('Admin', 'Admin'),
-    ('Usuario', 'Usuario'),
+    #Quien Encargado Del Parqueadero
     ('Operario', 'Operario'),
+    #Quien Maneja La Plataforma ParqueApp
+    ('Root', 'Root'),
 ]
 
 class UsuarioManager(BaseUserManager):
