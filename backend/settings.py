@@ -16,7 +16,7 @@ from decouple import config
 
 # DEVELOP
 FRONTEND_URL = "http://localhost:5173" 
-BACKEND_URL = "http://127.0.0.1:8000"
+BACKEND_URL = "http://127.0.0.1:8000/api"
 
 # PRODUCTION
 # FRONTEND_URL = "http://parqueapp.eleueleo.com" 
