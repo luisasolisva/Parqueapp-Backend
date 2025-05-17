@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Matriz del Parqueadero</title>
+    <style>
+        table { border-collapse: collapse; }
+        td { width: 40px; height: 40px; text-align: center; border: 1px solid black; }
+        .libre { background-color: #c8e6c9; }
+        .ocupado { background-color: #ffcdd2; }
+    </style>
+</head>
+<body>
+    <h1>Matriz del Parqueadero: {{ parqueadero.nombre }}</h1>
+    <form method="POST">
+        {% csrf_token %}
+        <table>
+            {% for fila in matriz %}
+                <tr>
+                    {% for espacio in fila %}
+                        <td class="{% if espacio == 1 %}ocupado{% else %}libre{% endif %}">
+                            {{ espacio }}
+                        </td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </table>
+    </form>
+</body>
+</html>

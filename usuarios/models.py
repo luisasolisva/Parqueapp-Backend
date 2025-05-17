@@ -88,6 +88,10 @@ class Parqueadero(models.Model):
     capacidad_disponible = models.IntegerField()
     precio_hora = models.DecimalField(max_digits=10, decimal_places=2)
     id_propietario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='parqueadero_set_usuarios')
+    filas = models.IntegerField()
+    columnas = models.IntegerField()
+
+    matriz = models.JSONField(default=list)
 
     def __str__(self):
         return self.nombre

@@ -61,6 +61,8 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from .permissions import IsAdminUser
 
+
+
 class CrearParqueaderoView(GenericAPIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
     serializer_class = ParqueaderoSerializer
@@ -75,7 +77,6 @@ class CrearParqueaderoView(GenericAPIView):
                 "parqueadero": parqueadero_data
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 
 
@@ -100,3 +101,75 @@ def lista_parqueaderos(request):
     } for p in parqueaderos]
 
     return JsonResponse({'parqueaderos': data})
+
+
+
+
+
+
+
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import render, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponseForbidden
+from usuarios.models import Parqueadero
+
+from django.shortcuts import render, get_object_or_404
+from usuarios.models import Parqueadero
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, get_object_or_404, redirect
+
+
+@login_required
+def modificar_matriz_parqueadero(request, id_parqueadero):
+    parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+
+    if request.user != parqueadero.id_propietario or request.user.tipo_usuario != 'Admin':
+        return HttpResponse("No tienes permiso para ver esta página", status=403)
+
+    if request.method == 'POST':
+        filas = len(parqueadero.matriz)
+        columnas = len(parqueadero.matriz[0])
+        nueva_matriz = []
+
+        for i in range(filas):
+            fila = []
+            for j in range(columnas):
+                nombre = request.POST.get(f'nombre_{i+1}_{j+1}')
+                estado = request.POST.get(f'estado_{i+1}_{j+1}')
+                fila.append({'nombre': nombre, 'estado': estado})
+            nueva_matriz.append(fila)
+
+        parqueadero.matriz = nueva_matriz
+        parqueadero.save()
+        return redirect('ver_matriz', id_parqueadero=parqueadero.id_parqueadero)
+
+
+    return render(request, 'parqueaderos/modificar_matriz.html', {
+        'parqueadero': parqueadero,
+        'matriz': parqueadero.matriz
+    })
+
+
+
+from django.shortcuts import render, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.utils.decorators import method_decorator
+from django.views import View
+from usuarios.models import Parqueadero
+from django.http import HttpResponse
+
+
+@method_decorator(login_required, name='dispatch')
+class VerMatrizParqueaderoView(View):
+    def get(self, request, id_parqueadero):
+        parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+
+        # Validación de permisos
+        if request.user != parqueadero.id_propietario and getattr(request.user, 'tipo_usuario', '') != 'Admin':
+            return render(request, 'no_autorizado.html', {'mensaje': 'No tienes permiso para ver la matriz.'})
+
+        return render(request, 'matriz.html', {'matriz': parqueadero.matriz, 'parqueadero': parqueadero})

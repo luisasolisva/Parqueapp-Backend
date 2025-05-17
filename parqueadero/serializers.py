@@ -7,11 +7,15 @@ class ParqueaderoSerializer(serializers.ModelSerializer):
         fields = ['id', 'nombre', 'direccion', 'latitud', 'longitud']
 
 
+
+
+
+
+from rest_framework import serializers
 from usuarios.models import Parqueadero
 
-
 class ParqueaderoSerializer(serializers.ModelSerializer):
-    id_propietario = serializers.ReadOnlyField(source='id_propietario.email')  # Mostrar el email del propietario
+    id_propietario = serializers.ReadOnlyField(source='id_propietario.email')  # Solo para mostrar
 
     class Meta:
         model = Parqueadero
@@ -25,17 +29,24 @@ class ParqueaderoSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         user = self.context['request'].user
-        filas = validated_data.get('filas')
-        columnas = validated_data.get('columnas')
 
-        # Crear matriz vacía según filas y columnas
-        matriz = [[0 for _ in range(columnas)] for _ in range(filas)]
+        filas = validated_data.pop('filas', None)
+        columnas = validated_data.pop('columnas', None)
+
+        if filas is None or columnas is None:
+            raise serializers.ValidationError("Los campos filas y columnas son obligatorios.")
+
+        matriz = [
+    [{"nombre": "", "estado": "Disponible"} for _ in range(columnas)]
+    for _ in range(filas)
+]
+
+
         validated_data['matriz'] = matriz
+
+        # Asignar propietario actual
         validated_data['id_propietario'] = user
 
-        parqueadero = Parqueadero.objects.create(**validated_data)
-        parqueadero.save()
-        
-        # Aquí podrías agregar alguna lógica extra, notificaciones, etc.
+        # Crear el parqueadero
+        return Parqueadero.objects.create(filas=filas, columnas=columnas, **validated_data)
 
-        return parqueadero

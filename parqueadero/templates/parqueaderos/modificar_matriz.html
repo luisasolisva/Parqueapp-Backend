@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Modificar Matriz del Parqueadero</title>
+  <style>
+    table { border-collapse: collapse; }
+    td {
+      width: 80px; height: 60px; text-align: center; vertical-align: middle; border: 1px solid black;
+      cursor: pointer;
+      position: relative;
+    }
+    .Disponible { background-color: #c8e6c9; }      /* verde */
+    .Ocupado { background-color: #ffcdd2; }        /* rojo */
+    .Fuera_de_servicio { background-color: #e0e0e0; } /* gris */
+
+    input[type="text"], select {
+      width: 90%;
+      box-sizing: border-box;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+<h2>Modificar Matriz del Parqueadero: {{ parqueadero.nombre }}</h2>
+
+<form method="POST" action="{% url 'modificar-matriz' parqueadero.id_parqueadero %}" id="matrizForm">
+  {% csrf_token %}
+  <table>
+    {% for fila in matriz %}
+      <tr>
+        {% for celda in fila %}
+          <td class="{% if celda.estado == 'Disponible' %}Disponible{% elif celda.estado == 'Ocupado' %}Ocupado{% else %}Fuera_de_servicio{% endif %}" data-fila="{{ forloop.parentloop.counter0 }}" data-col="{{ forloop.counter0 }}">
+            <div class="view-mode">
+              <div class="nombre">{{ celda.nombre }}</div>
+              <div class="estado">{{ celda.estado }}</div>
+            </div>
+            <div class="edit-mode" style="display:none;">
+              <input type="text" name="nombre_{{ forloop.parentloop.counter }}_{{ forloop.counter }}" value="{{ celda.nombre }}">
+              <select name="estado_{{ forloop.parentloop.counter }}_{{ forloop.counter }}">
+                <option value="Disponible" {% if celda.estado == 'Disponible' %}selected{% endif %}>Disponible</option>
+                <option value="Ocupado" {% if celda.estado == 'Ocupado' %}selected{% endif %}>Ocupado</option>
+                <option value="Fuera de servicio" {% if celda.estado == 'Fuera de servicio' %}selected{% endif %}>Fuera de servicio</option>
+              </select>
+            </div>
+          </td>
+        {% endfor %}
+      </tr>
+    {% endfor %}
+  </table>
+  <br>
+  <button type="submit">Guardar cambios</button>
+</form>
+
+<script>
+  document.querySelectorAll('td').forEach(td => {
+    td.addEventListener('click', () => {
+      const viewDiv = td.querySelector('.view-mode');
+      const editDiv = td.querySelector('.edit-mode');
+      if (editDiv.style.display === 'none') {
+        viewDiv.style.display = 'none';
+        editDiv.style.display = 'block';
+      }
+    });
+  });
+</script>
+
+</body>
+</html>
