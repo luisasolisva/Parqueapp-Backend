@@ -40,3 +40,63 @@ class ParqueaderosCercanosView(APIView):
 
         serializer = ParqueaderoSerializer(parqueaderos_cercanos, many=True)
         return Response(serializer.data)
+
+
+
+from django.http import JsonResponse, HttpResponseForbidden
+from django.contrib.auth.decorators import login_required
+from rest_framework import generics
+from rest_framework.permissions import IsAuthenticated
+from usuarios.models import Parqueadero
+from .serializers import ParqueaderoSerializer
+from rest_framework import generics
+from rest_framework.permissions import IsAuthenticated
+from usuarios.models import Parqueadero
+from .serializers import ParqueaderoSerializer
+from rest_framework.generics import GenericAPIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.generics import GenericAPIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from .permissions import IsAdminUser
+
+class CrearParqueaderoView(GenericAPIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    serializer_class = ParqueaderoSerializer
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            parqueadero = serializer.save()
+            parqueadero_data = ParqueaderoSerializer(parqueadero, context={'request': request}).data
+            return Response({
+                "message": "Parqueadero creado exitosamente.",
+                "parqueadero": parqueadero_data
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+
+@login_required
+def lista_parqueaderos(request):
+    # Solo usuarios que NO sean staff o superuser pueden entrar
+    if request.user.is_staff or request.user.is_superuser:
+        return HttpResponseForbidden("No tienes permiso para acceder a esta vista")
+
+    parqueaderos = Parqueadero.objects.all()
+    data = [{
+        'id': str(p.id_parqueadero),
+        'nombre': p.nombre,
+        'direccion': p.direccion,
+        'ciudad': p.ciudad,
+        'latitud': float(p.latitud),
+        'longitud': float(p.longitud),
+        'capacidad_total': p.capacidad_total,
+        'capacidad_disponible': p.capacidad_disponible,
+        'precio_hora': float(p.precio_hora),
+    } for p in parqueaderos]
+
+    return JsonResponse({'parqueaderos': data})
