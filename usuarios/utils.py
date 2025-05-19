@@ -16,7 +16,7 @@ def send_activation_email(user):
     uid = urlsafe_base64_encode(force_bytes(user.pk))
 
     # URL de activación
-    activation_link = f"http://localhost:8000/api/activar-cuenta/{uid}/{token}/"
+    activation_link = f"{settings.BACKEND_URL}/activar-cuenta/{uid}/{token}/"
 
     # Determinar la plantilla según el tipo de usuario
     if user.tipo_usuario == "Cliente":
@@ -55,7 +55,7 @@ def generar_enlace_activacion(usuario):
     # Generar el token para la activación
     token = default_token_generator.make_token(usuario)
     # Retornar el enlace completo
-    return f"http://localhost:8000/api/activar-cuenta/{uidb64}/{token}/"
+    return f"{settings.BACKEND_URL}/activar-cuenta/{uidb64}/{token}/"
 
 from django.core.mail import send_mail
 from django.conf import settings
