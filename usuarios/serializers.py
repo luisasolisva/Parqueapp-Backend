@@ -52,7 +52,7 @@ class LoginSerializer(serializers.Serializer):
         email = data.get('email')
         password = data.get('password')
 
-        user = User.objects.filter(email=email).first()
+        user = User.objects.filter(email=email.lower()).first()
 
         if not user:
             raise serializers.ValidationError({"error": "El correo o la contraseña no son correctos. Verifica e intenta nuevamente."})
