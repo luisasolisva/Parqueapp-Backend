@@ -3,8 +3,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from math import radians, cos, sin, asin, sqrt
-from .models import Parqueadero
-from .serializers import ParqueaderoSerializer  # Crea este si no existe
+from .serializers import ParqueaderoSerializer
+from usuarios.models import Parqueadero
 
 def calcular_distancia(lat1, lon1, lat2, lon2):
     # Fórmula Haversine
