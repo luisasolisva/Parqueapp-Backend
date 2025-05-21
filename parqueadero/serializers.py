@@ -1,10 +1,10 @@
 from rest_framework import serializers
-from .models import Parqueadero
+from usuarios.models import Parqueadero
 
 class ParqueaderoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Parqueadero
-        fields = ['id', 'nombre', 'direccion', 'latitud', 'longitud']
+        fields = ['id_parqueadero', 'nombre', 'direccion', 'ciudad', 'latitud', 'longitud', 'precio_hora']
 
 
 
