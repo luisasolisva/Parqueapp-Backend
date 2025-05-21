@@ -74,6 +74,8 @@ class LoginSerializer(serializers.Serializer):
 
         return {
             'user': user,
+            'user_id': user.id,  # UUID del usuario
+            'nombre': user.nombre,  # Nombre del usuario
             'refresh': str(refresh),
             'access': access_token,
         }
