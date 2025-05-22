@@ -27,12 +27,13 @@ class MatrizSerializer(serializers.ModelSerializer):
 
 
 
+
 class ParqueaderoSerializer(serializers.ModelSerializer):
     id_propietario = serializers.ReadOnlyField(source='id_propietario.email')  # Solo para mostrar
 
     class Meta:
         model = Parqueadero
-        fields = '__all__'
+        exclude = ['matriz']  # Excluir matriz del formulario
 
     def validate(self, data):
         user = self.context['request'].user
@@ -50,10 +51,9 @@ class ParqueaderoSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Los campos filas y columnas son obligatorios.")
 
         matriz = [
-    [{"nombre": "", "estado": "Disponible"} for _ in range(columnas)]
-    for _ in range(filas)
-]
-
+            [{"nombre": "", "estado": ""} for _ in range(columnas)]  # Estado y nombre vacíos
+            for _ in range(filas)
+        ]
 
         validated_data['matriz'] = matriz
 
