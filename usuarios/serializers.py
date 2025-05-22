@@ -189,3 +189,17 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
         user.save()
 
+from rest_framework import serializers
+from .models import Usuario
+
+#Serializer Para Obtener Información Del Usuario
+class UserRetrieveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Usuario
+        fields = ['nombre', 'apellido', 'email', 'telefono']
+
+#Serializer Para Actualizar Información Del Usuario
+class UserUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Usuario
+        fields = ['nombre', 'apellido', 'email', 'telefono']
