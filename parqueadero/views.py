@@ -3,8 +3,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from math import radians, cos, sin, asin, sqrt
-from .models import Parqueadero
-from .serializers import ParqueaderoSerializer  # Crea este si no existe
+from .serializers import ParqueaderoSerializer
+from usuarios.models import Parqueadero
 
 def calcular_distancia(lat1, lon1, lat2, lon2):
     # Fórmula Haversine
@@ -81,7 +81,7 @@ class CrearParqueaderoView(GenericAPIView):
 
 
 
-@login_required
+
 def lista_parqueaderos(request):
     # Solo usuarios que NO sean staff o superuser pueden entrar
     if request.user.is_staff or request.user.is_superuser:
@@ -98,9 +98,14 @@ def lista_parqueaderos(request):
         'capacidad_total': p.capacidad_total,
         'capacidad_disponible': p.capacidad_disponible,
         'precio_hora': float(p.precio_hora),
+        'nombre_propietario': p.nombre_propietario,  # Eliminado el espacio y paréntesis extra
+        'descripcion': p.descripcion,  # Eliminado el paréntesis extra
     } for p in parqueaderos]
 
     return JsonResponse({'parqueaderos': data})
+
+
+
 
 
 
@@ -112,46 +117,65 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from django.shortcuts import render, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.http import HttpResponseForbidden
+from .permissions import IsAdminUser
 from usuarios.models import Parqueadero
 
-from django.shortcuts import render, get_object_or_404
-from usuarios.models import Parqueadero
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, get_object_or_404, redirect
+class ModificarMatrizParqueaderoView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request, id_parqueadero):
+        parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+        
+        # Bloquear si el usuario no es admin
+        if request.user.tipo_usuario != "Admin":
+            return Response({"error": "Solo administradores pueden acceder"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Bloquear si el usuario no es el propietario del parqueadero
+        if request.user != parqueadero.id_propietario:
+            return Response({"error": "Solo el administrador propietario puede modificar esta matriz"}, status=status.HTTP_403_FORBIDDEN)
+
+        return Response({"matriz": parqueadero.matriz}, status=status.HTTP_200_OK)
+
+    def post(self, request, id_parqueadero):
+        parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+
+        # Bloquear si el usuario no es admin
+        if request.user.tipo_usuario != "Admin":
+            return Response({"error": "Solo administradores pueden modificar esta matriz"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Bloquear si el usuario no es el propietario del parqueadero
+        if request.user != parqueadero.id_propietario:
+            return Response({"error": "Solo el administrador propietario puede modificar esta matriz"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Asegurar que los datos vienen en `request.data`
+        cambios = request.data.get("cambios")
+        if not cambios:
+            return Response({"error": "Los cambios son requeridos"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            fila_idx = cambios.get("fila")
+            columna_idx = cambios.get("columna")
+            nuevo_nombre = cambios.get("nombre")
+            nuevo_estado = cambios.get("estado")
+
+            # Validar índices
+            if fila_idx is None or columna_idx is None:
+                return Response({"error": "Fila y columna son obligatorias"}, status=status.HTTP_400_BAD_REQUEST)
+
+            if nuevo_estado not in ["Disponible", "Ocupado", "Fuera_de_servicio"]:
+                return Response({"error": "Estado inválido. Solo se permite Disponible, Ocupado o Fuera de servicio"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Modificar solo el espacio especificado
+            parqueadero.matriz[fila_idx][columna_idx]["nombre"] = nuevo_nombre if nuevo_nombre is not None else ""
+            parqueadero.matriz[fila_idx][columna_idx]["estado"] = nuevo_estado
+
+            parqueadero.save()
+            return Response({"message": "Matriz actualizada correctamente", "matriz": parqueadero.matriz}, status=status.HTTP_200_OK)
+
+        except (IndexError, TypeError):
+            return Response({"error": "Posición inválida en la matriz"}, status=status.HTTP_400_BAD_REQUEST)
 
 
-@login_required
-def modificar_matriz_parqueadero(request, id_parqueadero):
-    parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
-
-    if request.user != parqueadero.id_propietario or request.user.tipo_usuario != 'Admin':
-        return HttpResponse("No tienes permiso para ver esta página", status=403)
-
-    if request.method == 'POST':
-        filas = len(parqueadero.matriz)
-        columnas = len(parqueadero.matriz[0])
-        nueva_matriz = []
-
-        for i in range(filas):
-            fila = []
-            for j in range(columnas):
-                nombre = request.POST.get(f'nombre_{i+1}_{j+1}')
-                estado = request.POST.get(f'estado_{i+1}_{j+1}')
-                fila.append({'nombre': nombre, 'estado': estado})
-            nueva_matriz.append(fila)
-
-        parqueadero.matriz = nueva_matriz
-        parqueadero.save()
-        return redirect('ver_matriz', id_parqueadero=parqueadero.id_parqueadero)
-
-
-    return render(request, 'parqueaderos/modificar_matriz.html', {
-        'parqueadero': parqueadero,
-        'matriz': parqueadero.matriz
-    })
 
 
 
@@ -173,3 +197,37 @@ class VerMatrizParqueaderoView(View):
             return render(request, 'no_autorizado.html', {'mensaje': 'No tienes permiso para ver la matriz.'})
 
         return render(request, 'matriz.html', {'matriz': parqueadero.matriz, 'parqueadero': parqueadero})
+
+
+
+
+
+
+class ModificarParqueaderoView(GenericAPIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    serializer_class = ParqueaderoSerializer
+    queryset = Parqueadero.objects.all()
+
+    def get_object(self):
+        return get_object_or_404(Parqueadero, id_parqueadero=self.kwargs['id_parqueadero'])
+
+    def get(self, request, id_parqueadero):
+        parqueadero = self.get_object()
+        serializer = self.get_serializer(parqueadero, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request, id_parqueadero):
+        parqueadero = self.get_object()
+
+        # Filtrar los datos para evitar la modificación de `filas` y `columnas`
+        datos_modificables = {k: v for k, v in request.data.items() if k not in ['filas', 'columnas']}
+
+        serializer = self.get_serializer(parqueadero, data=datos_modificables, context={'request': request}, partial=True)
+        if serializer.is_valid():
+            parqueadero = serializer.save()
+            parqueadero_data = ParqueaderoSerializer(parqueadero, context={'request': request}).data
+            return Response({
+                "message": "Parqueadero modificado exitosamente.",
+                "parqueadero": parqueadero_data
+            }, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
