@@ -50,3 +50,25 @@ class ParqueaderoSerializer(serializers.ModelSerializer):
         # Crear el parqueadero
         return Parqueadero.objects.create(filas=filas, columnas=columnas, **validated_data)
 
+
+
+
+
+
+
+
+
+
+from rest_framework import serializers
+from usuarios.models import Parqueadero
+
+class CeldaSerializer(serializers.Serializer):
+    nombre = serializers.CharField(max_length=50, allow_blank=True)
+    estado = serializers.ChoiceField(choices=["Disponible", "Ocupado", "Fuera_de_servicio"])
+
+class MatrizSerializer(serializers.ModelSerializer):
+    matriz = serializers.ListField(child=serializers.ListField(child=CeldaSerializer()))
+
+    class Meta:
+        model = Parqueadero
+        fields = ['id_parqueadero', 'matriz']
