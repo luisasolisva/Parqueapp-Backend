@@ -209,3 +209,19 @@ class ResetPasswordView(APIView):
         serializer.save()
 
         return Response({"message": "Contraseña restablecida con éxito."}, status=status.HTTP_200_OK)
+
+from rest_framework import generics, permissions
+from .models import Usuario
+from .serializers import UserRetrieveSerializer, UserUpdateSerializer
+
+#Obtener Información Del Usuario
+class UserRetrieveView(generics.RetrieveAPIView):
+    queryset = Usuario.objects.all()
+    serializer_class = UserRetrieveSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+#Actualizar Información Del Usuario
+class UserUpdateView(generics.UpdateAPIView):
+    queryset = Usuario.objects.all()
+    serializer_class = UserUpdateSerializer
+    permission_classes = [permissions.IsAuthenticated]
