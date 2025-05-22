@@ -55,6 +55,7 @@ SECURE_SSL_REDIRECT = False  # Redirige todas las solicitudes HTTP
 SESSION_COOKIE_SECURE = False  # Asegura que las cookies de sesión solo se envíen por HTTP
 CSRF_COOKIE_SECURE = False  # Asegura que las cookies CSRF solo se envíen por HTTP
 
+APPEND_SLASH = False
 
 
 # Application definition

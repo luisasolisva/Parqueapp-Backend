@@ -219,9 +219,11 @@ class UserRetrieveView(generics.RetrieveAPIView):
     queryset = Usuario.objects.all()
     serializer_class = UserRetrieveSerializer
     permission_classes = [permissions.IsAuthenticated]
+    lookup_field = "id" 
 
 #Actualizar Información Del Usuario
 class UserUpdateView(generics.UpdateAPIView):
     queryset = Usuario.objects.all()
     serializer_class = UserUpdateSerializer
     permission_classes = [permissions.IsAuthenticated]
+    lookup_field = "id" 

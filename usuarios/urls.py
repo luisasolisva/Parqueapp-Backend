@@ -19,8 +19,8 @@ urlpatterns = [
     path('verify-reset-code/', VerifyResetCodeView.as_view(), name='verify_reset_code'),
     path('reset-password/', ResetPasswordView.as_view(), name='password_reset_confirm'),
 
-    path('user/info/<uidb64>/', UserRetrieveView.as_view(), name='user-detail'),
-    path('user/update/<uidb64>/', UserUpdateView.as_view(), name='user-update'),
+    path('user/info/<uuid:id>/', UserRetrieveView.as_view(), name='user-info'),
+    path('user/update/<uuid:id>/', UserUpdateView.as_view(), name='user-update'),
 
     # URLs actualizadas para gestión de clientes usando uidb64
     path('clientes/<uidb64>/status/', ClienteStatusView.as_view(), name='cliente_status'), # Desactivar/activar cuenta de cliente
