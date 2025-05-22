@@ -148,22 +148,32 @@ class ModificarMatrizParqueaderoView(APIView):
             return Response({"error": "Solo el administrador propietario puede modificar esta matriz"}, status=status.HTTP_403_FORBIDDEN)
 
         # Asegurar que los datos vienen en `request.data`
-        matriz = request.data.get("matriz")
-        if not matriz:
-            return Response({"error": "La matriz es requerida"}, status=status.HTTP_400_BAD_REQUEST)
+        cambios = request.data.get("cambios")
+        if not cambios:
+            return Response({"error": "Los cambios son requeridos"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Validar que los estados sean correctos
-        for fila in matriz:
-            for celda in fila:
-                if celda.get("estado") not in ["Disponible", "Ocupado", "Fuera_de_servicio"]:
-                    return Response({"error": "Estado inválido. Solo se permite Disponible, Ocupado o Fuera de servicio"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            fila_idx = cambios.get("fila")
+            columna_idx = cambios.get("columna")
+            nuevo_nombre = cambios.get("nombre")
+            nuevo_estado = cambios.get("estado")
 
-        # Guardar cambios en la base de datos
-        parqueadero.matriz = matriz
-        parqueadero.save()
+            # Validar índices
+            if fila_idx is None or columna_idx is None:
+                return Response({"error": "Fila y columna son obligatorias"}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({"message": "Matriz actualizada correctamente", "matriz": parqueadero.matriz}, status=status.HTTP_200_OK)
+            if nuevo_estado not in ["Disponible", "Ocupado", "Fuera_de_servicio"]:
+                return Response({"error": "Estado inválido. Solo se permite Disponible, Ocupado o Fuera de servicio"}, status=status.HTTP_400_BAD_REQUEST)
 
+            # Modificar solo el espacio especificado
+            parqueadero.matriz[fila_idx][columna_idx]["nombre"] = nuevo_nombre if nuevo_nombre is not None else ""
+            parqueadero.matriz[fila_idx][columna_idx]["estado"] = nuevo_estado
+
+            parqueadero.save()
+            return Response({"message": "Matriz actualizada correctamente", "matriz": parqueadero.matriz}, status=status.HTTP_200_OK)
+
+        except (IndexError, TypeError):
+            return Response({"error": "Posición inválida en la matriz"}, status=status.HTTP_400_BAD_REQUEST)
 
 
 
