@@ -88,7 +88,7 @@ class Parqueadero(models.Model):
     capacidad_disponible = models.IntegerField()
     precio_hora = models.DecimalField(max_digits=10, decimal_places=2)
     nombre_propietario = models.CharField(max_length=200) 
-    #id_propietario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='parqueadero_set_usuarios')
+    id_propietario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='parqueadero_set_usuarios')
     descripcion = models.TextField(blank=True, null=True) 
     filas = models.IntegerField()
     columnas = models.IntegerField()
