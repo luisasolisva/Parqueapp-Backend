@@ -203,7 +203,6 @@ class VerMatrizParqueaderoView(View):
 
 
 
-
 class ModificarParqueaderoView(GenericAPIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
     serializer_class = ParqueaderoSerializer
@@ -219,7 +218,11 @@ class ModificarParqueaderoView(GenericAPIView):
 
     def put(self, request, id_parqueadero):
         parqueadero = self.get_object()
-        serializer = self.get_serializer(parqueadero, data=request.data, context={'request': request}, partial=True)
+
+        # Filtrar los datos para evitar la modificación de `filas` y `columnas`
+        datos_modificables = {k: v for k, v in request.data.items() if k not in ['filas', 'columnas']}
+
+        serializer = self.get_serializer(parqueadero, data=datos_modificables, context={'request': request}, partial=True)
         if serializer.is_valid():
             parqueadero = serializer.save()
             parqueadero_data = ParqueaderoSerializer(parqueadero, context={'request': request}).data
