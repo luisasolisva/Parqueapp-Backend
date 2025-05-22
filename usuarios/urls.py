@@ -1,11 +1,13 @@
 from django.urls import path
+from .views import UserRetrieveView, UserUpdateView
 from .views import RegisterView, VistaActivacionCuenta
 from .views import LoginView, ClienteStatusView, ClienteUpdateView
+from .views import SendResetCodeView, VerifyResetCodeView, ResetPasswordView
+
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
-from .views import SendResetCodeView, VerifyResetCodeView, ResetPasswordView
 
 urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
@@ -16,6 +18,10 @@ urlpatterns = [
     path('send-reset-code/', SendResetCodeView.as_view(), name='send_reset_code'),
     path('verify-reset-code/', VerifyResetCodeView.as_view(), name='verify_reset_code'),
     path('reset-password/', ResetPasswordView.as_view(), name='password_reset_confirm'),
+
+    path('user/info/<uidb64>/', UserRetrieveView.as_view(), name='user-detail'),
+    path('user/update/<uidb64>/', UserUpdateView.as_view(), name='user-update'),
+
     # URLs actualizadas para gestión de clientes usando uidb64
     path('clientes/<uidb64>/status/', ClienteStatusView.as_view(), name='cliente_status'), # Desactivar/activar cuenta de cliente
     path('clientes/<uidb64>/update/', ClienteUpdateView.as_view(), name='cliente_update'), # Actualizar datos de cliente
