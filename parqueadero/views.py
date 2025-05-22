@@ -81,7 +81,7 @@ class CrearParqueaderoView(GenericAPIView):
 
 
 
-@login_required
+
 def lista_parqueaderos(request):
     # Solo usuarios que NO sean staff o superuser pueden entrar
     if request.user.is_staff or request.user.is_superuser:
@@ -98,6 +98,8 @@ def lista_parqueaderos(request):
         'capacidad_total': p.capacidad_total,
         'capacidad_disponible': p.capacidad_disponible,
         'precio_hora': float(p.precio_hora),
+        'nombre_propietario': p.nombre_propietario,  # Eliminado el espacio y paréntesis extra
+        'descripcion': p.descripcion,  # Eliminado el paréntesis extra
     } for p in parqueaderos]
 
     return JsonResponse({'parqueaderos': data})
