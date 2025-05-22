@@ -187,3 +187,34 @@ class VerMatrizParqueaderoView(View):
             return render(request, 'no_autorizado.html', {'mensaje': 'No tienes permiso para ver la matriz.'})
 
         return render(request, 'matriz.html', {'matriz': parqueadero.matriz, 'parqueadero': parqueadero})
+
+
+
+
+
+
+
+class ModificarParqueaderoView(GenericAPIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    serializer_class = ParqueaderoSerializer
+    queryset = Parqueadero.objects.all()
+
+    def get_object(self):
+        return get_object_or_404(Parqueadero, id_parqueadero=self.kwargs['id_parqueadero'])
+
+    def get(self, request, id_parqueadero):
+        parqueadero = self.get_object()
+        serializer = self.get_serializer(parqueadero, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request, id_parqueadero):
+        parqueadero = self.get_object()
+        serializer = self.get_serializer(parqueadero, data=request.data, context={'request': request}, partial=True)
+        if serializer.is_valid():
+            parqueadero = serializer.save()
+            parqueadero_data = ParqueaderoSerializer(parqueadero, context={'request': request}).data
+            return Response({
+                "message": "Parqueadero modificado exitosamente.",
+                "parqueadero": parqueadero_data
+            }, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
