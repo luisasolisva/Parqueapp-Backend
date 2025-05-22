@@ -110,50 +110,62 @@ def lista_parqueaderos(request):
 
 
 
+
+
+
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from django.shortcuts import render, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.http import HttpResponseForbidden
+from .permissions import IsAdminUser
 from usuarios.models import Parqueadero
 
-from django.shortcuts import render, get_object_or_404
-from usuarios.models import Parqueadero
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, get_object_or_404, redirect
+class ModificarMatrizParqueaderoView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
 
+    def get(self, request, id_parqueadero):
+        parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+        
+        # Bloquear si el usuario no es admin
+        if request.user.tipo_usuario != "Admin":
+            return Response({"error": "Solo administradores pueden acceder"}, status=status.HTTP_403_FORBIDDEN)
 
-@login_required
-def modificar_matriz_parqueadero(request, id_parqueadero):
-    parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+        # Bloquear si el usuario no es el propietario del parqueadero
+        if request.user != parqueadero.id_propietario:
+            return Response({"error": "Solo el administrador propietario puede modificar esta matriz"}, status=status.HTTP_403_FORBIDDEN)
 
-    if request.user != parqueadero.id_propietario or request.user.tipo_usuario != 'Admin':
-        return HttpResponse("No tienes permiso para ver esta página", status=403)
+        return Response({"matriz": parqueadero.matriz}, status=status.HTTP_200_OK)
 
-    if request.method == 'POST':
-        filas = len(parqueadero.matriz)
-        columnas = len(parqueadero.matriz[0])
-        nueva_matriz = []
+    def post(self, request, id_parqueadero):
+        parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
 
-        for i in range(filas):
-            fila = []
-            for j in range(columnas):
-                nombre = request.POST.get(f'nombre_{i+1}_{j+1}')
-                estado = request.POST.get(f'estado_{i+1}_{j+1}')
-                fila.append({'nombre': nombre, 'estado': estado})
-            nueva_matriz.append(fila)
+        # Bloquear si el usuario no es admin
+        if request.user.tipo_usuario != "Admin":
+            return Response({"error": "Solo administradores pueden modificar esta matriz"}, status=status.HTTP_403_FORBIDDEN)
 
-        parqueadero.matriz = nueva_matriz
+        # Bloquear si el usuario no es el propietario del parqueadero
+        if request.user != parqueadero.id_propietario:
+            return Response({"error": "Solo el administrador propietario puede modificar esta matriz"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Asegurar que los datos vienen en `request.data`
+        matriz = request.data.get("matriz")
+        if not matriz:
+            return Response({"error": "La matriz es requerida"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validar que los estados sean correctos
+        for fila in matriz:
+            for celda in fila:
+                if celda.get("estado") not in ["Disponible", "Ocupado", "Fuera_de_servicio"]:
+                    return Response({"error": "Estado inválido. Solo se permite Disponible, Ocupado o Fuera de servicio"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Guardar cambios en la base de datos
+        parqueadero.matriz = matriz
         parqueadero.save()
-        return redirect('ver_matriz', id_parqueadero=parqueadero.id_parqueadero)
+
+        return Response({"message": "Matriz actualizada correctamente", "matriz": parqueadero.matriz}, status=status.HTTP_200_OK)
 
 
-    return render(request, 'parqueaderos/modificar_matriz.html', {
-        'parqueadero': parqueadero,
-        'matriz': parqueadero.matriz
-    })
+
 
 
 
