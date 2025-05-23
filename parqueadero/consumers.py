@@ -14,7 +14,7 @@ class ParqueaderoConsumer(AsyncWebsocketConsumer):
     # Recibe mensajes del WebSocket
     async def receive(self, text_data):
         data = json.loads(text_data)
-        # Por ejemplo, reenvía el mensaje a todo el grupo
+        # Si el mensaje recibido es una actualización de matriz, lo reenvía a todos
         await self.channel_layer.group_send(
             "parqueadero_group",
             {
@@ -26,21 +26,10 @@ class ParqueaderoConsumer(AsyncWebsocketConsumer):
     # Recibe mensajes del grupo
     async def parqueadero_message(self, event):
         message = event['message']
-
-        # Enviar mensaje al WebSocket
+        # Enviar mensaje al WebSocket (puede ser dict o string)
         await self.send(text_data=json.dumps({
             'message': message
         }))
 
 
 
-class TestConsumer(AsyncWebsocketConsumer):
-    async def connect(self):
-        await self.accept()
-        await self.send(text_data=json.dumps({'message': 'Conexión aceptada'}))
-
-    async def disconnect(self, close_code):
-        pass
-
-    async def receive(self, text_data):
-        await self.send(text_data=json.dumps({'message': text_data}))
