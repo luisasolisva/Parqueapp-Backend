@@ -1,5 +1,8 @@
+
+
 from rest_framework import serializers
 from usuarios.models import Parqueadero
+
 
 class ParqueaderoSerializer(serializers.ModelSerializer):
     class Meta:
@@ -11,15 +14,26 @@ class ParqueaderoSerializer(serializers.ModelSerializer):
 
 
 
-from rest_framework import serializers
-from usuarios.models import Parqueadero
+class CeldaSerializer(serializers.Serializer):
+    nombre = serializers.CharField(max_length=50, allow_blank=True)
+    estado = serializers.ChoiceField(choices=["Disponible", "Ocupado", "Fuera_de_servicio"])
+
+class MatrizSerializer(serializers.ModelSerializer):
+    matriz = serializers.ListField(child=serializers.ListField(child=CeldaSerializer()))
+
+    class Meta:
+        model = Parqueadero
+        fields = ['id_parqueadero', 'matriz']
+
+
+
 
 class ParqueaderoSerializer(serializers.ModelSerializer):
     id_propietario = serializers.ReadOnlyField(source='id_propietario.email')  # Solo para mostrar
 
     class Meta:
         model = Parqueadero
-        fields = '__all__'
+        exclude = ['matriz']  # Excluir matriz del formulario
 
     def validate(self, data):
         user = self.context['request'].user
@@ -37,10 +51,9 @@ class ParqueaderoSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Los campos filas y columnas son obligatorios.")
 
         matriz = [
-    [{"nombre": "", "estado": "Disponible"} for _ in range(columnas)]
-    for _ in range(filas)
-]
-
+            [{"nombre": "", "estado": ""} for _ in range(columnas)]  # Estado y nombre vacíos
+            for _ in range(filas)
+        ]
 
         validated_data['matriz'] = matriz
 
@@ -49,4 +62,3 @@ class ParqueaderoSerializer(serializers.ModelSerializer):
 
         # Crear el parqueadero
         return Parqueadero.objects.create(filas=filas, columnas=columnas, **validated_data)
-

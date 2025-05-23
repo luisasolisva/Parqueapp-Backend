@@ -17,10 +17,10 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
             usuario = Usuario.objects.create_user(
-                email=validated_data['email'],
+                email=validated_data['email'].lower(),
                 password=validated_data['password'],  # Se asegura de usar set_password correctamente
-                nombre=validated_data['nombre'],
-                apellido=validated_data['apellido'],
+                nombre=validated_data['nombre'].title(),
+                apellido=validated_data['apellido'].title(),
                 telefono=validated_data['telefono'],
                 tipo_usuario=validated_data['tipo_usuario'],
             )
@@ -52,7 +52,7 @@ class LoginSerializer(serializers.Serializer):
         email = data.get('email')
         password = data.get('password')
 
-        user = User.objects.filter(email=email).first()
+        user = User.objects.filter(email=email.lower()).first()
 
         if not user:
             raise serializers.ValidationError({"error": "El correo o la contraseña no son correctos. Verifica e intenta nuevamente."})
@@ -74,6 +74,8 @@ class LoginSerializer(serializers.Serializer):
 
         return {
             'user': user,
+            'user_id': user.id,  # UUID del usuario
+            'nombre': user.nombre,  # Nombre del usuario
             'refresh': str(refresh),
             'access': access_token,
         }

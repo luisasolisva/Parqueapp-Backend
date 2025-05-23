@@ -43,6 +43,8 @@ class LoginView(APIView):
                 "message": "Inicio de sesión exitoso.",
                 "refresh": str(refresh),
                 "access": str(refresh.access_token),
+                "user_id": user.id,  # UUID del usuario
+                "nombre": user.nombre,  # Nombre del usuario
                 "tipo_usuario": user.tipo_usuario,
             }, status=status.HTTP_200_OK)
 
