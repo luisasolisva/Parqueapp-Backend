@@ -30,6 +30,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
+
 SECRET_KEY = 'django-insecure-wepj7d-(spdlkf=vxh%@3m0kk#4&i5a_anwfyhz0h-69x-2s35'
 
 #--NO TOCAR
@@ -61,6 +62,7 @@ APPEND_SLASH = False
 # Application definition
 
 INSTALLED_APPS = [
+    'channels',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -139,9 +141,9 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'parqueapp',           #  el nombre de su base de datos
+        'NAME': 'parqueos',           #  el nombre de su base de datos
         'USER': 'root',             # usuario de MySQL
-        'PASSWORD': '12345678',# contraseña de MySQL
+        'PASSWORD': '1318',# contraseña de MySQL
         'HOST': 'localhost',
         'PORT': '3306',
     }
@@ -274,3 +276,16 @@ AUTH_USER_MODEL = 'usuarios.Usuario'  # Usa el nombre correcto de tu app
 
 TIME_ZONE = 'America/Bogota'  # Zona horaria de Colombia
 USE_TZ = True
+
+ASGI_APPLICATION = 'backend.asgi.application'  
+
+
+# Configuración simple para channel layers usando Redis (recomendado)
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
+    }
+}
+
+
+#SECRET_KEY = config('SECRET_KEY')

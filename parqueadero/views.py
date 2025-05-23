@@ -5,6 +5,8 @@ from rest_framework.permissions import IsAuthenticated
 from math import radians, cos, sin, asin, sqrt
 from .serializers import ParqueaderoSerializer
 from usuarios.models import Parqueadero
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 def calcular_distancia(lat1, lon1, lat2, lon2):
     # Fórmula Haversine
@@ -170,6 +172,20 @@ class ModificarMatrizParqueaderoView(APIView):
             parqueadero.matriz[fila_idx][columna_idx]["estado"] = nuevo_estado
 
             parqueadero.save()
+
+            # Enviar actualización por WebSocket
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                "parqueadero_group",
+                {
+                    "type": "parqueadero_message",
+                    "message": {
+                        "id_parqueadero": str(parqueadero.id_parqueadero),
+                        "matriz": parqueadero.matriz
+                    }
+                }
+            )
+
             return Response({"message": "Matriz actualizada correctamente", "matriz": parqueadero.matriz}, status=status.HTTP_200_OK)
 
         except (IndexError, TypeError):
