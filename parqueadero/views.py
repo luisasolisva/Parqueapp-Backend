@@ -247,3 +247,35 @@ class ModificarParqueaderoView(GenericAPIView):
                 "parqueadero": parqueadero_data
             }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from usuarios.models import Parqueadero
+
+class ListaEspaciosDisponiblesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, id_parqueadero):
+        # Bloquear acceso si el usuario no es un cliente
+        if request.user.tipo_usuario != "Cliente":
+            return Response({"error": "Solo los clientes pueden ver los espacios disponibles"}, status=status.HTTP_403_FORBIDDEN)
+
+        parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+        
+        espacios_disponibles = []
+        for fila_idx, fila in enumerate(parqueadero.matriz):
+            for columna_idx, celda in enumerate(fila):
+                if celda["estado"] == "Disponible":
+                    espacios_disponibles.append({
+                        "id_espacio": f"{parqueadero.id_parqueadero}-{fila_idx}-{columna_idx}",
+                        "fila": fila_idx,
+                        "columna": columna_idx,
+                        "nombre": celda["nombre"]
+                    })
+
+        return Response({"espacios_disponibles": espacios_disponibles}, status=status.HTTP_200_OK)
+
+
