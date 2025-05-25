@@ -14,22 +14,24 @@
 
         .matriz-grid {
             display: grid;
-            gap: 10px;
+            gap: 5px;
             margin-top: 20px;
             grid-template-columns: repeat(var(--columnas), 1fr);
         }
 
         .espacio {
             aspect-ratio: 1;
-            border-radius: 8px;
+            border-radius: 4px;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            padding: 10px;
+            padding: 5px;
             cursor: pointer;
             transition: all 0.3s ease;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            font-size: 0.8em;
+            text-align: center;
         }
 
         .espacio:hover {
@@ -39,43 +41,41 @@
 
         .espacio-nombre {
             font-weight: bold;
-            margin-bottom: 5px;
+            margin-bottom: 2px;
         }
 
-        .espacio-estado {
-            font-size: 0.9em;
-            padding: 2px 8px;
-            border-radius: 12px;
+        .espacio-tipo {
+            font-size: 0.7em;
+            padding: 2px 4px;
+            border-radius: 4px;
+            color: white;
         }
 
-        .disponible {
-            background-color: #d4edda;
-            border: 2px solid #c3e6cb;
-        }
-
-        .disponible .espacio-estado {
+        .parqueo {
             background-color: #28a745;
-            color: white;
+            border: 2px solid #218838;
         }
 
-        .ocupado {
-            background-color: #f8d7da;
-            border: 2px solid #f5c6cb;
+        .parqueo .espacio-tipo {
+            background-color: #1e7e34;
         }
 
-        .ocupado .espacio-estado {
+        .pasillo {
+            background-color: #17a2b8;
+            border: 2px solid #138496;
+        }
+
+        .pasillo .espacio-tipo {
+            background-color: #117a8b;
+        }
+
+        .obstruccion {
             background-color: #dc3545;
-            color: white;
+            border: 2px solid #bd2130;
         }
 
-        .fuera-servicio {
-            background-color: #e2e3e5;
-            border: 2px solid #d6d8db;
-        }
-
-        .fuera-servicio .espacio-estado {
-            background-color: #6c757d;
-            color: white;
+        .obstruccion .espacio-tipo {
+            background-color: #c82333;
         }
 
         .header-info {
@@ -103,6 +103,58 @@
             height: 20px;
             border-radius: 4px;
         }
+
+        .modal-estado {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+        }
+
+        .modal-backdrop {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+
+        .btn-estado {
+            margin: 5px;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: white;
+            width: 100%;
+        }
+
+        .btn-parqueo {
+            background-color: #28a745;
+        }
+
+        .btn-pasillo {
+            background-color: #17a2b8;
+        }
+
+        .btn-obstruccion {
+            background-color: #dc3545;
+        }
+
+        .btn-estado:hover {
+            opacity: 0.9;
+            transform: scale(1.05);
+        }
     </style>
 </head>
 <body>
@@ -124,31 +176,119 @@
 
         <div class="estado-leyenda">
             <div class="leyenda-item">
-                <div class="leyenda-color disponible"></div>
-                <span>Disponible</span>
+                <div class="leyenda-color parqueo"></div>
+                <span>Espacio de Parqueo</span>
             </div>
             <div class="leyenda-item">
-                <div class="leyenda-color ocupado"></div>
-                <span>Ocupado</span>
+                <div class="leyenda-color pasillo"></div>
+                <span>Pasillo / Zona Vacía</span>
             </div>
             <div class="leyenda-item">
-                <div class="leyenda-color fuera-servicio"></div>
-                <span>Fuera de Servicio</span>
+                <div class="leyenda-color obstruccion"></div>
+                <span>Obstrucción</span>
             </div>
         </div>
 
         <div class="matriz-grid" style="--columnas: {{ parqueadero.columnas }};">
             {% for fila in matriz %}
                 {% for celda in fila %}
-                    <div class="espacio {% if celda.estado == 'Disponible' %}disponible{% elif celda.estado == 'Ocupado' %}ocupado{% else %}fuera-servicio{% endif %}">
+                    <div class="espacio {% if celda.tipo == 'parqueo' %}parqueo{% elif celda.tipo == 'pasillo' %}pasillo{% else %}obstruccion{% endif %}"
+                         data-fila="{{ forloop.parentloop.counter0 }}"
+                         data-columna="{{ forloop.counter0 }}"
+                         onclick="mostrarModalEstado(this)">
                         <div class="espacio-nombre">{{ celda.nombre }}</div>
-                        <div class="espacio-estado">{{ celda.estado }}</div>
+                        <div class="espacio-tipo">{{ celda.tipo|title }}</div>
                     </div>
                 {% endfor %}
             {% endfor %}
         </div>
     </div>
 
+    <!-- Modal para seleccionar tipo de espacio -->
+    <div class="modal-backdrop" id="modalBackdrop"></div>
+    <div class="modal-estado" id="modalEstado">
+        <h3 class="mb-3">Seleccionar Tipo de Espacio</h3>
+        <div class="d-flex flex-column">
+            <button class="btn-estado btn-parqueo" onclick="cambiarTipo('parqueo')">Espacio de Parqueo</button>
+            <button class="btn-estado btn-pasillo" onclick="cambiarTipo('pasillo')">Pasillo / Zona Vacía</button>
+            <button class="btn-estado btn-obstruccion" onclick="cambiarTipo('obstruccion')">Obstrucción</button>
+        </div>
+        <button class="btn btn-secondary mt-3" onclick="cerrarModal()">Cancelar</button>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let espacioSeleccionado = null;
+
+        function mostrarModalEstado(elemento) {
+            espacioSeleccionado = elemento;
+            document.getElementById('modalBackdrop').style.display = 'block';
+            document.getElementById('modalEstado').style.display = 'block';
+        }
+
+        function cerrarModal() {
+            document.getElementById('modalBackdrop').style.display = 'none';
+            document.getElementById('modalEstado').style.display = 'none';
+            espacioSeleccionado = null;
+        }
+
+        function cambiarTipo(nuevoTipo) {
+            if (!espacioSeleccionado) return;
+
+            const fila = espacioSeleccionado.dataset.fila;
+            const columna = espacioSeleccionado.dataset.columna;
+
+            // Actualizar la interfaz
+            espacioSeleccionado.className = `espacio ${nuevoTipo}`;
+            espacioSeleccionado.querySelector('.espacio-tipo').textContent = nuevoTipo.charAt(0).toUpperCase() + nuevoTipo.slice(1);
+
+            // Enviar actualización al servidor
+            fetch(`/api/parqueadero/modificar-matriz/{{ parqueadero.id_parqueadero }}/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    cambios: {
+                        fila: parseInt(fila),
+                        columna: parseInt(columna),
+                        tipo: nuevoTipo
+                    }
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error al actualizar el tipo: ' + data.error);
+                    location.reload();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error al actualizar el tipo');
+                location.reload();
+            });
+
+            cerrarModal();
+        }
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        document.getElementById('modalBackdrop').addEventListener('click', cerrarModal);
+    </script>
 </body>
 </html>

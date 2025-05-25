@@ -1,12 +1,15 @@
 from django.urls import path
-from .views import ParqueaderosCercanosView
-from .views import CrearParqueaderoView, lista_parqueaderos
-from .views import ModificarParqueaderoView
-from .views import VerMatrizParqueaderoView, ModificarMatrizParqueaderoView, ListaEspaciosDisponiblesView, CargarMatrizBaseView
-from . import views
-
-
-
+from .views import (
+    ParqueaderosCercanosView,
+    CrearParqueaderoView,
+    lista_parqueaderos,
+    ModificarParqueaderoView,
+    VerMatrizParqueaderoView,
+    ModificarMatrizParqueaderoView,
+    ListaEspaciosDisponiblesView,
+    CargarMatrizBaseView,
+    ModificarMatrizView
+)
 
 urlpatterns = [
     path('cercanos/', ParqueaderosCercanosView.as_view(), name='parqueaderos_cercanos'),
@@ -16,5 +19,6 @@ urlpatterns = [
     path('ver-matriz/<uuid:id_parqueadero>/', VerMatrizParqueaderoView.as_view(), name='ver_matriz'),
     path('modificar/<uuid:id_parqueadero>/', ModificarParqueaderoView.as_view(), name='modificar_parqueadero'),
     path('Espacios-disponibles/<uuid:id_parqueadero>/', ListaEspaciosDisponiblesView.as_view(), name='lista_espacios_disponibles'),
-    path('cargar-matriz-base/<uuid:id_parqueadero>/', CargarMatrizBaseView.as_view(), name='cargar_matriz_base'),
+    path('parqueadero/<uuid:id_parqueadero>/matriz/', CargarMatrizBaseView.as_view(), name='cargar-matriz'),
+    path('parqueadero/<uuid:id_parqueadero>/modificar-matriz/', ModificarMatrizView.as_view(), name='modificar-matriz'),
 ]

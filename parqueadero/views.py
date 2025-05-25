@@ -299,8 +299,10 @@ class CargarMatrizBaseView(APIView):
             # Si la matriz está vacía, inicializarla
             if not matriz:
                 matriz = [
-                    [{"nombre": f"P-{i+1}-{j+1}", "estado": "Disponible"} 
-                     for j in range(parqueadero.columnas)]
+                    [{
+                        "nombre": f"P-{i+1}-{j+1}",
+                        "tipo": "parqueo"  # Por defecto, todos los espacios son de parqueo
+                    } for j in range(parqueadero.columnas)]
                     for i in range(parqueadero.filas)
                 ]
                 parqueadero.matriz = matriz
@@ -315,6 +317,70 @@ class CargarMatrizBaseView(APIView):
         except Exception as e:
             return Response(
                 {"error": f"Error al cargar la matriz: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class ModificarMatrizView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, id_parqueadero):
+        try:
+            parqueadero = Parqueadero.objects.get(id_parqueadero=id_parqueadero)
+            
+            # Verificar que el usuario es propietario o admin
+            if not (request.user.tipo_usuario == 'Admin' or 
+                   request.user == parqueadero.propietario):
+                return Response(
+                    {'error': 'No tienes permiso para modificar este parqueadero'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            cambios = request.data.get('cambios', {})
+            fila = cambios.get('fila')
+            columna = cambios.get('columna')
+            nuevo_tipo = cambios.get('tipo')
+
+            if None in (fila, columna, nuevo_tipo):
+                return Response(
+                    {'error': 'Faltan datos requeridos'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Validar el tipo de espacio
+            tipos_validos = ['parqueo', 'pasillo', 'obstruccion']
+            if nuevo_tipo not in tipos_validos:
+                return Response(
+                    {'error': f'Tipo de espacio inválido. Debe ser uno de: {", ".join(tipos_validos)}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Obtener la matriz actual
+            matriz = parqueadero.matriz
+            if not matriz or fila >= len(matriz) or columna >= len(matriz[0]):
+                return Response(
+                    {'error': 'Coordenadas de matriz inválidas'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Actualizar el tipo de espacio
+            matriz[fila][columna]['tipo'] = nuevo_tipo
+            parqueadero.matriz = matriz
+            parqueadero.save()
+
+            return Response({
+                'mensaje': 'Tipo de espacio actualizado correctamente',
+                'matriz': matriz
+            })
+
+        except Parqueadero.DoesNotExist:
+            return Response(
+                {'error': 'Parqueadero no encontrado'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
