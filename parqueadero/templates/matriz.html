@@ -155,6 +155,73 @@
             opacity: 0.9;
             transform: scale(1.05);
         }
+
+        .herramientas-container {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .herramienta-grupo {
+            margin-bottom: 15px;
+        }
+
+        .herramienta-grupo h4 {
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            color: #495057;
+        }
+
+        .btn-herramienta {
+            margin: 2px;
+            padding: 5px 10px;
+            font-size: 0.9em;
+        }
+
+        .btn-patron {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .btn-patron:hover {
+            background-color: #5a6268;
+            color: white;
+        }
+
+        .btn-relleno {
+            background-color: #17a2b8;
+            color: white;
+        }
+
+        .btn-relleno:hover {
+            background-color: #138496;
+            color: white;
+        }
+
+        .seleccion-activa {
+            background-color: #28a745 !important;
+            color: white !important;
+            border: 2px solid #218838 !important;
+        }
+
+        .instrucciones {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+
+        .acciones-seleccion {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        .acciones-seleccion.visible {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -171,6 +238,39 @@
                 <div class="col-md-4">
                     <p><strong>Precio por Hora:</strong> ${{ parqueadero.precio_hora }}</p>
                 </div>
+            </div>
+        </div>
+
+        <!-- Herramientas de Selección Rápida -->
+        <div class="herramientas-container">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="herramienta-grupo">
+                        <h4>Patrones Predefinidos</h4>
+                        <button class="btn btn-patron btn-herramienta" onclick="aplicarPatron('diagonal')">Diagonal</button>
+                        <button class="btn btn-patron btn-herramienta" onclick="aplicarPatron('linea')">Línea Recta</button>
+                        <button class="btn btn-patron btn-herramienta" onclick="aplicarPatron('zigzag')">Zigzag</button>
+                        <div class="instrucciones">Selecciona un patrón para aplicarlo a toda la matriz</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="herramienta-grupo">
+                        <h4>Relleno Rápido</h4>
+                        <button class="btn btn-relleno btn-herramienta" onclick="activarSeleccionMultiple()">Selección Múltiple</button>
+                        <button class="btn btn-relleno btn-herramienta" onclick="rellenarFila()">Rellenar Fila</button>
+                        <button class="btn btn-relleno btn-herramienta" onclick="rellenarColumna()">Rellenar Columna</button>
+                        <div class="instrucciones">Haz clic para activar el modo de selección</div>
+                    </div>
+                </div>
+            </div>
+            <!-- Acciones para selección múltiple -->
+            <div class="acciones-seleccion" id="accionesSeleccion">
+                <h5>Acciones para la selección</h5>
+                <button class="btn btn-success btn-sm" onclick="aplicarCambiosSeleccion('parqueo')">Aplicar Parqueo</button>
+                <button class="btn btn-info btn-sm" onclick="aplicarCambiosSeleccion('pasillo')">Aplicar Pasillo</button>
+                <button class="btn btn-danger btn-sm" onclick="aplicarCambiosSeleccion('obstruccion')">Aplicar Obstrucción</button>
+                <button class="btn btn-secondary btn-sm" onclick="limpiarSeleccion()">Limpiar Selección</button>
+                <span class="ms-3">Espacios seleccionados: <span id="contadorSeleccion">0</span></span>
             </div>
         </div>
 
@@ -195,7 +295,7 @@
                     <div class="espacio {% if celda.tipo == 'parqueo' %}parqueo{% elif celda.tipo == 'pasillo' %}pasillo{% else %}obstruccion{% endif %}"
                          data-fila="{{ forloop.parentloop.counter0 }}"
                          data-columna="{{ forloop.counter0 }}"
-                         onclick="mostrarModalEstado(this)">
+                         onclick="manejarClic(this)">
                         <div class="espacio-nombre">{{ celda.nombre }}</div>
                         <div class="espacio-tipo">{{ celda.tipo|title }}</div>
                     </div>
@@ -219,9 +319,111 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let espacioSeleccionado = null;
+        let modoSeleccionMultiple = false;
+        let celdasSeleccionadas = new Set();
+        let ultimoTipoSeleccionado = null;
+
+        function manejarClic(elemento) {
+            if (modoSeleccionMultiple) {
+                elemento.classList.toggle('seleccion-activa');
+                if (elemento.classList.contains('seleccion-activa')) {
+                    celdasSeleccionadas.add(elemento);
+                } else {
+                    celdasSeleccionadas.delete(elemento);
+                }
+                actualizarContadorSeleccion();
+            } else {
+                mostrarModalEstado(elemento);
+            }
+        }
+
+        function activarSeleccionMultiple() {
+            modoSeleccionMultiple = !modoSeleccionMultiple;
+            const boton = event.target;
+            const accionesSeleccion = document.getElementById('accionesSeleccion');
+            
+            if (modoSeleccionMultiple) {
+                boton.classList.add('seleccion-activa');
+                boton.textContent = 'Finalizar Selección';
+                accionesSeleccion.classList.add('visible');
+            } else {
+                boton.classList.remove('seleccion-activa');
+                boton.textContent = 'Selección Múltiple';
+                accionesSeleccion.classList.remove('visible');
+                limpiarSeleccion();
+            }
+        }
+
+        function rellenarFila() {
+            const maxFila = parseInt('{{ parqueadero.filas }}') - 1;
+            const maxColumna = parseInt('{{ parqueadero.columnas }}');
+            const fila = prompt(`Ingresa el número de fila (0-${maxFila}):`);
+            
+            if (fila !== null) {
+                const filaNum = parseInt(fila);
+                if (filaNum >= 0 && filaNum <= maxFila) {
+                    mostrarModalEstado(null);
+                    ultimoTipoSeleccionado = null;
+                    for (let i = 0; i < maxColumna; i++) {
+                        const celda = document.querySelector(`[data-fila="${filaNum}"][data-columna="${i}"]`);
+                        celdasSeleccionadas.add(celda);
+                    }
+                } else {
+                    alert('Número de fila inválido');
+                }
+            }
+        }
+
+        function rellenarColumna() {
+            const maxFila = parseInt('{{ parqueadero.filas }}');
+            const maxColumna = parseInt('{{ parqueadero.columnas }}') - 1;
+            const columna = prompt(`Ingresa el número de columna (0-${maxColumna}):`);
+            
+            if (columna !== null) {
+                const columnaNum = parseInt(columna);
+                if (columnaNum >= 0 && columnaNum <= maxColumna) {
+                    mostrarModalEstado(null);
+                    ultimoTipoSeleccionado = null;
+                    for (let i = 0; i < maxFila; i++) {
+                        const celda = document.querySelector(`[data-fila="${i}"][data-columna="${columnaNum}"]`);
+                        celdasSeleccionadas.add(celda);
+                    }
+                } else {
+                    alert('Número de columna inválido');
+                }
+            }
+        }
+
+        function aplicarPatron(tipo) {
+            const maxFila = parseInt('{{ parqueadero.filas }}');
+            const maxColumna = parseInt('{{ parqueadero.columnas }}');
+
+            for (let i = 0; i < maxFila; i++) {
+                for (let j = 0; j < maxColumna; j++) {
+                    let tipoEspacio = 'pasillo';
+                    
+                    switch(tipo) {
+                        case 'diagonal':
+                            if ((i + j) % 2 === 0) tipoEspacio = 'parqueo';
+                            break;
+                        case 'linea':
+                            if (j % 2 === 0) tipoEspacio = 'parqueo';
+                            break;
+                        case 'zigzag':
+                            if ((i + Math.floor(j/2)) % 2 === 0) tipoEspacio = 'parqueo';
+                            break;
+                    }
+                    
+                    const celda = document.querySelector(`[data-fila="${i}"][data-columna="${j}"]`);
+                    cambiarTipoCelda(celda, tipoEspacio);
+                }
+            }
+        }
 
         function mostrarModalEstado(elemento) {
-            espacioSeleccionado = elemento;
+            if (elemento) {
+                espacioSeleccionado = elemento;
+            }
             document.getElementById('modalBackdrop').style.display = 'block';
             document.getElementById('modalEstado').style.display = 'block';
         }
@@ -230,17 +432,29 @@
             document.getElementById('modalBackdrop').style.display = 'none';
             document.getElementById('modalEstado').style.display = 'none';
             espacioSeleccionado = null;
+            if (modoSeleccionMultiple) {
+                limpiarSeleccion();
+            }
         }
 
         function cambiarTipo(nuevoTipo) {
-            if (!espacioSeleccionado) return;
+            if (modoSeleccionMultiple && celdasSeleccionadas.size > 0) {
+                celdasSeleccionadas.forEach(celda => {
+                    cambiarTipoCelda(celda, nuevoTipo);
+                });
+            } else if (espacioSeleccionado) {
+                cambiarTipoCelda(espacioSeleccionado, nuevoTipo);
+            }
+            cerrarModal();
+        }
 
-            const fila = espacioSeleccionado.dataset.fila;
-            const columna = espacioSeleccionado.dataset.columna;
+        function cambiarTipoCelda(celda, nuevoTipo) {
+            const fila = celda.dataset.fila;
+            const columna = celda.dataset.columna;
 
             // Actualizar la interfaz
-            espacioSeleccionado.className = `espacio ${nuevoTipo}`;
-            espacioSeleccionado.querySelector('.espacio-tipo').textContent = nuevoTipo.charAt(0).toUpperCase() + nuevoTipo.slice(1);
+            celda.className = `espacio ${nuevoTipo}`;
+            celda.querySelector('.espacio-tipo').textContent = nuevoTipo.charAt(0).toUpperCase() + nuevoTipo.slice(1);
 
             // Enviar actualización al servidor
             fetch(`/api/parqueadero/modificar-matriz/{{ parqueadero.id_parqueadero }}/`, {
@@ -269,8 +483,6 @@
                 alert('Error al actualizar el tipo');
                 location.reload();
             });
-
-            cerrarModal();
         }
 
         function getCookie(name) {
@@ -286,6 +498,31 @@
                 }
             }
             return cookieValue;
+        }
+
+        function actualizarContadorSeleccion() {
+            document.getElementById('contadorSeleccion').textContent = celdasSeleccionadas.size;
+        }
+
+        function limpiarSeleccion() {
+            celdasSeleccionadas.forEach(celda => {
+                celda.classList.remove('seleccion-activa');
+            });
+            celdasSeleccionadas.clear();
+            actualizarContadorSeleccion();
+        }
+
+        function aplicarCambiosSeleccion(tipo) {
+            if (celdasSeleccionadas.size === 0) {
+                alert('No hay espacios seleccionados');
+                return;
+            }
+
+            celdasSeleccionadas.forEach(celda => {
+                cambiarTipoCelda(celda, tipo);
+            });
+
+            limpiarSeleccion();
         }
 
         document.getElementById('modalBackdrop').addEventListener('click', cerrarModal);
