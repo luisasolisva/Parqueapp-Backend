@@ -279,3 +279,43 @@ class ListaEspaciosDisponiblesView(APIView):
         return Response({"espacios_disponibles": espacios_disponibles}, status=status.HTTP_200_OK)
 
 
+class CargarMatrizBaseView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get(self, request, id_parqueadero):
+        try:
+            parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+            
+            # Verificar permisos
+            if request.user != parqueadero.id_propietario:
+                return Response(
+                    {"error": "Solo el propietario puede cargar la matriz base"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            # Obtener la matriz actual
+            matriz = parqueadero.matriz
+            
+            # Si la matriz está vacía, inicializarla
+            if not matriz:
+                matriz = [
+                    [{"nombre": f"P-{i+1}-{j+1}", "estado": "Disponible"} 
+                     for j in range(parqueadero.columnas)]
+                    for i in range(parqueadero.filas)
+                ]
+                parqueadero.matriz = matriz
+                parqueadero.save()
+
+            return Response({
+                "matriz": matriz,
+                "filas": parqueadero.filas,
+                "columnas": parqueadero.columnas
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"error": f"Error al cargar la matriz: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
