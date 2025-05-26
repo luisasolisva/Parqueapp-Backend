@@ -7,6 +7,7 @@ from .serializers import ParqueaderoSerializer
 from usuarios.models import Parqueadero
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from .models import CambioMatriz
 
 def calcular_distancia(lat1, lon1, lat2, lon2):
     # Fórmula Haversine
@@ -326,7 +327,7 @@ class ModificarMatrizView(APIView):
 
     def post(self, request, id_parqueadero):
         try:
-            parqueadero = Parqueadero.objects.get(id_parqueadero=id_parqueadero)
+            parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
             
             # Verificar que el usuario es propietario o admin
             if not (request.user.tipo_usuario == 'Admin' or 
@@ -363,14 +364,83 @@ class ModificarMatrizView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
+            # Guardar el tipo anterior
+            tipo_anterior = matriz[fila][columna]['tipo']
+
             # Actualizar el tipo de espacio
             matriz[fila][columna]['tipo'] = nuevo_tipo
             parqueadero.matriz = matriz
+            
+            # Guardar en la base de datos
             parqueadero.save()
+
+            # Registrar el cambio en el historial
+            CambioMatriz.objects.create(
+                parqueadero=parqueadero,
+                fila=fila,
+                columna=columna,
+                tipo_anterior=tipo_anterior,
+                tipo_nuevo=nuevo_tipo,
+                usuario=request.user
+            )
+
+            # Enviar actualización por WebSocket
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                "parqueadero_group",
+                {
+                    "type": "parqueadero_message",
+                    "message": {
+                        "id_parqueadero": str(parqueadero.id_parqueadero),
+                        "matriz": parqueadero.matriz
+                    }
+                }
+            )
 
             return Response({
                 'mensaje': 'Tipo de espacio actualizado correctamente',
-                'matriz': matriz
+                'matriz': matriz,
+                'ultima_actualizacion': parqueadero.updated_at if hasattr(parqueadero, 'updated_at') else None
+            })
+
+        except Parqueadero.DoesNotExist:
+            return Response(
+                {'error': 'Parqueadero no encontrado'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def get(self, request, id_parqueadero):
+        try:
+            parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+            
+            # Verificar que el usuario es propietario o admin
+            if not (request.user.tipo_usuario == 'Admin' or 
+                   request.user == parqueadero.propietario):
+                return Response(
+                    {'error': 'No tienes permiso para ver este parqueadero'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            # Obtener el historial de cambios
+            cambios = CambioMatriz.objects.filter(parqueadero=parqueadero).order_by('-fecha_cambio')[:10]
+            historial = [{
+                'fila': cambio.fila,
+                'columna': cambio.columna,
+                'tipo_anterior': cambio.tipo_anterior,
+                'tipo_nuevo': cambio.tipo_nuevo,
+                'fecha': cambio.fecha_cambio,
+                'usuario': cambio.usuario.email if cambio.usuario else None
+            } for cambio in cambios]
+
+            return Response({
+                'matriz': parqueadero.matriz,
+                'ultima_actualizacion': parqueadero.updated_at if hasattr(parqueadero, 'updated_at') else None,
+                'historial_cambios': historial
             })
 
         except Parqueadero.DoesNotExist:
@@ -616,6 +686,81 @@ class RellenarAreaMatrizView(APIView):
         except Exception as e:
             return Response(
                 {"error": f"Error al rellenar el área: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class GuardarMatrizCompletaView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def post(self, request, id_parqueadero):
+        try:
+            parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+            
+            # Verificar permisos
+            if request.user != parqueadero.id_propietario:
+                return Response(
+                    {"error": "Solo el propietario puede guardar la matriz completa"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            # Obtener la matriz del request
+            matriz_completa = request.data.get('matriz')
+            if not matriz_completa:
+                return Response(
+                    {"error": "La matriz es requerida"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Validar estructura de la matriz
+            if not isinstance(matriz_completa, list) or len(matriz_completa) != parqueadero.filas:
+                return Response(
+                    {"error": "Estructura de matriz inválida"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            for fila in matriz_completa:
+                if not isinstance(fila, list) or len(fila) != parqueadero.columnas:
+                    return Response(
+                        {"error": "Estructura de matriz inválida"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                for celda in fila:
+                    if not isinstance(celda, dict) or 'tipo' not in celda:
+                        return Response(
+                            {"error": "Formato de celda inválido"},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    if celda['tipo'] not in ['parqueo', 'pasillo', 'obstruccion']:
+                        return Response(
+                            {"error": "Tipo de espacio inválido"},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+
+            # Guardar la matriz completa
+            parqueadero.matriz = matriz_completa
+            parqueadero.save()
+
+            # Enviar actualización por WebSocket
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                "parqueadero_group",
+                {
+                    "type": "parqueadero_message",
+                    "message": {
+                        "id_parqueadero": str(parqueadero.id_parqueadero),
+                        "matriz": parqueadero.matriz
+                    }
+                }
+            )
+
+            return Response({
+                'mensaje': 'Matriz guardada correctamente',
+                'redirect_url': f'/parqueadero/ver-matriz/{id_parqueadero}/'
+            })
+
+        except Exception as e:
+            return Response(
+                {"error": f"Error al guardar la matriz: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 

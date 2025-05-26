@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Matriz del Parqueadero</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
     <style>
         .matriz-container {
             padding: 20px;
@@ -250,9 +251,102 @@
             50% { opacity: 0.5; }
             100% { opacity: 1; }
         }
+
+        /* Nuevos estilos para mejor accesibilidad y UX */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .tooltip-custom {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip-custom .tooltip-text {
+            visibility: hidden;
+            width: 200px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .tooltip-custom:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .btn:focus {
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        }
+
+        .espacio:focus {
+            outline: 3px solid #0d6efd;
+            outline-offset: 2px;
+        }
+
+        .confirmacion-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1001;
+        }
+
+        .confirmacion-backdrop {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
     </style>
 </head>
 <body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+
     <div class="container matriz-container">
         <div class="header-info">
             <h1 class="text-center mb-4">{{ parqueadero.nombre }}</h1>
@@ -275,28 +369,73 @@
                 <div class="col-md-6">
                     <div class="herramienta-grupo">
                         <h4>Patrones Predefinidos</h4>
-                        <button class="btn btn-patron btn-herramienta" onclick="aplicarPatron('diagonal')">Diagonal</button>
-                        <button class="btn btn-patron btn-herramienta" onclick="aplicarPatron('linea')">Línea Recta</button>
-                        <button class="btn btn-patron btn-herramienta" onclick="aplicarPatron('zigzag')">Zigzag</button>
-                        <div class="instrucciones">Selecciona un patrón para aplicarlo a toda la matriz</div>
+                        <div class="tooltip-custom">
+                            <button class="btn btn-patron btn-herramienta" onclick="aplicarPatron('diagonal')" 
+                                    aria-label="Aplicar patrón diagonal">
+                                <i class="bi bi-diagram-3"></i> Diagonal
+                            </button>
+                            <span class="tooltip-text">Aplica un patrón diagonal alternando espacios de parqueo y pasillos</span>
+                        </div>
+                        <div class="tooltip-custom">
+                            <button class="btn btn-patron btn-herramienta" onclick="aplicarPatron('linea')"
+                                    aria-label="Aplicar patrón línea recta">
+                                <i class="bi bi-distribute-vertical"></i> Línea Recta
+                            </button>
+                            <span class="tooltip-text">Aplica un patrón de líneas rectas alternando columnas</span>
+                        </div>
+                        <div class="tooltip-custom">
+                            <button class="btn btn-patron btn-herramienta" onclick="aplicarPatron('zigzag')"
+                                    aria-label="Aplicar patrón zigzag">
+                                <i class="bi bi-bezier"></i> Zigzag
+                            </button>
+                            <span class="tooltip-text">Aplica un patrón zigzag alternando espacios</span>
+                        </div>
                     </div>
                 </div>
                 <div class="col-md-6">
                     <div class="herramienta-grupo">
                         <h4>Relleno Rápido</h4>
-                        <button class="btn btn-relleno btn-herramienta" onclick="activarSeleccionMultiple()">Selección Múltiple</button>
-                        <button class="btn btn-relleno btn-herramienta" onclick="rellenarFila()">Rellenar Fila</button>
-                        <button class="btn btn-relleno btn-herramienta" onclick="rellenarColumna()">Rellenar Columna</button>
-                        <div class="instrucciones">Haz clic para activar el modo de selección</div>
+                        <div class="tooltip-custom">
+                            <button class="btn btn-relleno btn-herramienta" onclick="activarSeleccionMultiple()"
+                                    aria-label="Activar selección múltiple">
+                                <i class="bi bi-grid-3x3"></i> Selección Múltiple
+                            </button>
+                            <span class="tooltip-text">Selecciona múltiples espacios para modificarlos a la vez</span>
+                        </div>
+                        <div class="tooltip-custom">
+                            <button class="btn btn-relleno btn-herramienta" onclick="rellenarFila()"
+                                    aria-label="Rellenar fila">
+                                <i class="bi bi-arrow-right"></i> Rellenar Fila
+                            </button>
+                            <span class="tooltip-text">Rellena una fila completa con el mismo tipo de espacio</span>
+                        </div>
+                        <div class="tooltip-custom">
+                            <button class="btn btn-relleno btn-herramienta" onclick="rellenarColumna()"
+                                    aria-label="Rellenar columna">
+                                <i class="bi bi-arrow-down"></i> Rellenar Columna
+                            </button>
+                            <span class="tooltip-text">Rellena una columna completa con el mismo tipo de espacio</span>
+                        </div>
                     </div>
                 </div>
             </div>
-            <!-- Botón de Validación -->
+            <!-- Botones de Validación y Guardado -->
             <div class="row mt-3">
                 <div class="col-12">
-                    <button class="btn btn-primary" onclick="validarEstructura()">
-                        Validar Estructura
-                    </button>
+                    <div class="tooltip-custom">
+                        <button class="btn btn-primary me-2" onclick="validarEstructura()"
+                                aria-label="Validar estructura del parqueadero">
+                            <i class="bi bi-check-circle"></i> Validar Estructura
+                        </button>
+                        <span class="tooltip-text">Verifica que la estructura del parqueadero sea válida</span>
+                    </div>
+                    <div class="tooltip-custom">
+                        <button class="btn btn-success" onclick="confirmarGuardado()"
+                                aria-label="Guardar matriz">
+                            <i class="bi bi-save"></i> Guardar Matriz
+                        </button>
+                        <span class="tooltip-text">Guarda los cambios realizados en la matriz</span>
+                    </div>
                     <div id="validacionResultado" class="validacion-resultado" style="display: none;"></div>
                 </div>
             </div>
@@ -353,12 +492,109 @@
         <button class="btn btn-secondary mt-3" onclick="cerrarModal()">Cancelar</button>
     </div>
 
+    <!-- Modal de Confirmación -->
+    <div class="confirmacion-backdrop" id="confirmacionBackdrop"></div>
+    <div class="confirmacion-modal" id="confirmacionModal">
+        <h4>Confirmar Acción</h4>
+        <p id="confirmacionMensaje"></p>
+        <div class="d-flex justify-content-end mt-3">
+            <button class="btn btn-secondary me-2" onclick="cerrarConfirmacion()">Cancelar</button>
+            <button class="btn btn-primary" id="confirmacionBoton">Confirmar</button>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let espacioSeleccionado = null;
         let modoSeleccionMultiple = false;
         let celdasSeleccionadas = new Set();
         let ultimoTipoSeleccionado = null;
+        let cambiosPendientes = false;
+        let ultimoGuardado = Date.now();
+
+        // Función para guardar automáticamente
+        function autoGuardar() {
+            if (cambiosPendientes && (Date.now() - ultimoGuardado) > 30000) { // Guardar cada 30 segundos si hay cambios
+                guardarMatrizCompleta(false); // false indica que es un autoguardado
+            }
+        }
+
+        // Iniciar el autoguardado
+        setInterval(autoGuardar, 5000); // Verificar cada 5 segundos
+
+        // Manejar recarga de página
+        window.addEventListener('beforeunload', function(e) {
+            if (cambiosPendientes) {
+                e.preventDefault();
+                e.returnValue = 'Tienes cambios sin guardar. ¿Estás seguro de que quieres salir?';
+            }
+        });
+
+        function guardarMatrizCompleta(mostrarMensaje = true) {
+            mostrarLoading();
+            try {
+                // Obtener la matriz actual del DOM
+                const matriz = [];
+                const filas = parseInt('{{ parqueadero.filas }}');
+                const columnas = parseInt('{{ parqueadero.columnas }}');
+
+                for (let i = 0; i < filas; i++) {
+                    const fila = [];
+                    for (let j = 0; j < columnas; j++) {
+                        const celda = document.querySelector(`[data-fila="${i}"][data-columna="${j}"]`);
+                        const tipo = celda.classList.contains('parqueo') ? 'parqueo' :
+                                   celda.classList.contains('pasillo') ? 'pasillo' : 'obstruccion';
+                        fila.push({
+                            'nombre': celda.querySelector('.espacio-nombre').textContent,
+                            'tipo': tipo
+                        });
+                    }
+                    matriz.push(fila);
+                }
+
+                // Enviar la matriz al servidor
+                fetch(`/api/parqueadero/parqueadero/{{ parqueadero.id_parqueadero }}/guardar-matriz/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({ matriz: matriz })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        if (mostrarMensaje) {
+                            alert('Error: ' + data.error);
+                        }
+                    } else {
+                        cambiosPendientes = false;
+                        ultimoGuardado = Date.now();
+                        
+                        if (mostrarMensaje) {
+                            // Mostrar mensaje de éxito
+                            const mensaje = document.createElement('div');
+                            mensaje.className = 'alert alert-success';
+                            mensaje.textContent = 'Matriz guardada correctamente. Redirigiendo...';
+                            document.querySelector('.matriz-container').prepend(mensaje);
+                            
+                            // Redirigir después de 1.5 segundos
+                            setTimeout(() => {
+                                window.location.href = data.redirect_url;
+                            }, 1500);
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    if (mostrarMensaje) {
+                        alert('Error al guardar la matriz');
+                    }
+                });
+            } finally {
+                ocultarLoading();
+            }
+        }
 
         function manejarClic(elemento) {
             if (modoSeleccionMultiple) {
@@ -516,6 +752,9 @@
             celda.className = `espacio ${nuevoTipo}`;
             celda.querySelector('.espacio-tipo').textContent = nuevoTipo.charAt(0).toUpperCase() + nuevoTipo.slice(1);
 
+            // Marcar que hay cambios pendientes
+            cambiosPendientes = true;
+
             // Enviar actualización al servidor
             fetch(`/api/parqueadero/modificar-matriz/{{ parqueadero.id_parqueadero }}/`, {
                 method: 'POST',
@@ -536,6 +775,9 @@
                 if (data.error) {
                     alert('Error al actualizar el tipo: ' + data.error);
                     location.reload();
+                } else {
+                    cambiosPendientes = false;
+                    ultimoGuardado = Date.now();
                 }
             })
             .catch(error => {
@@ -586,56 +828,104 @@
         }
 
         function validarEstructura() {
-            fetch(`/api/parqueadero/parqueadero/{{ parqueadero.id_parqueadero }}/validar-estructura/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken')
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                const resultadoDiv = document.getElementById('validacionResultado');
-                resultadoDiv.style.display = 'block';
+            mostrarLoading();
+            try {
+                fetch(`/api/parqueadero/parqueadero/{{ parqueadero.id_parqueadero }}/validar-estructura/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const resultadoDiv = document.getElementById('validacionResultado');
+                    resultadoDiv.style.display = 'block';
 
-                // Limpiar resaltados anteriores
-                document.querySelectorAll('.espacio').forEach(espacio => {
-                    espacio.classList.remove('espacio-invalido');
-                });
-
-                if (data.valido) {
-                    resultadoDiv.className = 'validacion-resultado validacion-exito';
-                    resultadoDiv.innerHTML = '<strong>✓ Estructura válida:</strong> La configuración del parqueadero es correcta.';
-                } else {
-                    resultadoDiv.className = 'validacion-resultado validacion-error';
-                    resultadoDiv.innerHTML = `
-                        <strong>✗ Se encontraron ${data.errores.length} problemas:</strong>
-                        <ul>
-                            ${data.errores.map(error => `<li>${error.mensaje}</li>`).join('')}
-                        </ul>
-                    `;
-
-                    // Resaltar espacios inválidos
-                    data.espacios_invalidos.forEach(espacio => {
-                        const celda = document.querySelector(
-                            `[data-fila="${espacio.fila}"][data-columna="${espacio.columna}"]`
-                        );
-                        if (celda) {
-                            celda.classList.add('espacio-invalido');
-                        }
+                    // Limpiar resaltados anteriores
+                    document.querySelectorAll('.espacio').forEach(espacio => {
+                        espacio.classList.remove('espacio-invalido');
                     });
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                const resultadoDiv = document.getElementById('validacionResultado');
-                resultadoDiv.style.display = 'block';
-                resultadoDiv.className = 'validacion-resultado validacion-error';
-                resultadoDiv.innerHTML = '<strong>✗ Error:</strong> No se pudo validar la estructura.';
-            });
+
+                    if (data.valido) {
+                        resultadoDiv.className = 'validacion-resultado validacion-exito';
+                        resultadoDiv.innerHTML = '<strong>✓ Estructura válida:</strong> La configuración del parqueadero es correcta.';
+                    } else {
+                        resultadoDiv.className = 'validacion-resultado validacion-error';
+                        resultadoDiv.innerHTML = `
+                            <strong>✗ Se encontraron ${data.errores.length} problemas:</strong>
+                            <ul>
+                                ${data.errores.map(error => `<li>${error.mensaje}</li>`).join('')}
+                            </ul>
+                        `;
+
+                        // Resaltar espacios inválidos
+                        data.espacios_invalidos.forEach(espacio => {
+                            const celda = document.querySelector(
+                                `[data-fila="${espacio.fila}"][data-columna="${espacio.columna}"]`
+                            );
+                            if (celda) {
+                                celda.classList.add('espacio-invalido');
+                            }
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    const resultadoDiv = document.getElementById('validacionResultado');
+                    resultadoDiv.style.display = 'block';
+                    resultadoDiv.className = 'validacion-resultado validacion-error';
+                    resultadoDiv.innerHTML = '<strong>✗ Error:</strong> No se pudo validar la estructura.';
+                });
+            } finally {
+                ocultarLoading();
+            }
         }
 
         document.getElementById('modalBackdrop').addEventListener('click', cerrarModal);
+
+        // Nuevas funciones para mejorar la UX
+        function mostrarLoading() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+
+        function ocultarLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        function confirmarGuardado() {
+            document.getElementById('confirmacionMensaje').textContent = '¿Estás seguro de que deseas guardar los cambios?';
+            document.getElementById('confirmacionBoton').onclick = () => {
+                cerrarConfirmacion();
+                guardarMatrizCompleta();
+            };
+            mostrarConfirmacion();
+        }
+
+        function mostrarConfirmacion() {
+            document.getElementById('confirmacionBackdrop').style.display = 'block';
+            document.getElementById('confirmacionModal').style.display = 'block';
+        }
+
+        function cerrarConfirmacion() {
+            document.getElementById('confirmacionBackdrop').style.display = 'none';
+            document.getElementById('confirmacionModal').style.display = 'none';
+        }
+
+        // Agregar manejo de teclado para accesibilidad
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                cerrarModal();
+                cerrarConfirmacion();
+            }
+        });
+
+        // Mejorar el manejo de errores
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            console.error('Error: ', msg, 'URL: ', url, 'Line: ', lineNo, 'Column: ', columnNo, 'Error object: ', error);
+            alert('Ha ocurrido un error. Por favor, intente nuevamente.');
+            return false;
+        };
     </script>
 </body>
 </html>
