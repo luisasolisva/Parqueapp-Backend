@@ -385,3 +385,238 @@ class ModificarMatrizView(APIView):
             )
 
 
+class ValidarEstructuraMatrizView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def post(self, request, id_parqueadero):
+        try:
+            parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+            
+            # Verificar permisos
+            if request.user != parqueadero.id_propietario:
+                return Response(
+                    {"error": "Solo el propietario puede validar la estructura"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            matriz = parqueadero.matriz
+            errores = []
+            espacios_invalidos = []
+
+            def es_posicion_valida(fila, columna):
+                return 0 <= fila < parqueadero.filas and 0 <= columna < parqueadero.columnas
+
+            def obtener_tipo_espacio(fila, columna):
+                if not es_posicion_valida(fila, columna):
+                    return None
+                return matriz[fila][columna].get('tipo')
+
+            # Validar cada espacio de parqueo
+            for i in range(parqueadero.filas):
+                for j in range(parqueadero.columnas):
+                    if matriz[i][j].get('tipo') == 'parqueo':
+                        tiene_acceso = False
+                        direcciones = [
+                            (i-1, j), (i+1, j), (i, j-1), (i, j+1)
+                        ]
+
+                        # Verificar acceso a pasillos
+                        for fila, columna in direcciones:
+                            if (es_posicion_valida(fila, columna) and 
+                                obtener_tipo_espacio(fila, columna) == 'pasillo'):
+                                tiene_acceso = True
+                                break
+
+                        if not tiene_acceso:
+                            errores.append({
+                                'tipo': 'sin_acceso',
+                                'mensaje': f'El espacio de parqueo en ({i+1},{j+1}) no tiene acceso a un pasillo',
+                                'fila': i,
+                                'columna': j
+                            })
+                            espacios_invalidos.append({'fila': i, 'columna': j})
+
+            # Validar conectividad de pasillos
+            pasillos = []
+            for i in range(parqueadero.filas):
+                for j in range(parqueadero.columnas):
+                    if matriz[i][j].get('tipo') == 'pasillo':
+                        pasillos.append((i, j))
+
+            if pasillos:
+                # Verificar que todos los pasillos estén conectados
+                visitados = set()
+                def dfs(fila, columna):
+                    if not es_posicion_valida(fila, columna) or (fila, columna) in visitados:
+                        return
+                    if obtener_tipo_espacio(fila, columna) != 'pasillo':
+                        return
+                    visitados.add((fila, columna))
+                    for df, dc in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
+                        dfs(fila + df, columna + dc)
+
+                # Comenzar DFS desde el primer pasillo
+                dfs(pasillos[0][0], pasillos[0][1])
+                
+                # Verificar si todos los pasillos fueron visitados
+                if len(visitados) != len(pasillos):
+                    errores.append({
+                        'tipo': 'pasillos_desconectados',
+                        'mensaje': 'Existen pasillos desconectados entre sí'
+                    })
+
+            return Response({
+                'valido': len(errores) == 0,
+                'errores': errores,
+                'espacios_invalidos': espacios_invalidos
+            })
+
+        except Exception as e:
+            return Response(
+                {"error": f"Error al validar la estructura: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class AplicarPatronMatrizView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def post(self, request, id_parqueadero):
+        try:
+            parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+            
+            # Verificar permisos
+            if request.user != parqueadero.id_propietario:
+                return Response(
+                    {"error": "Solo el propietario puede aplicar patrones"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            patron = request.data.get('patron')
+            if not patron:
+                return Response(
+                    {"error": "El patrón es requerido"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Obtener la matriz actual
+            matriz = parqueadero.matriz
+            if not matriz:
+                matriz = [[{"nombre": "", "tipo": "pasillo"} for _ in range(parqueadero.columnas)] 
+                         for _ in range(parqueadero.filas)]
+
+            # Aplicar el patrón seleccionado
+            if patron == 'diagonal':
+                for i in range(parqueadero.filas):
+                    for j in range(parqueadero.columnas):
+                        if (i + j) % 2 == 0:
+                            matriz[i][j]['tipo'] = 'parqueo'
+                        else:
+                            matriz[i][j]['tipo'] = 'pasillo'
+
+            elif patron == 'linea':
+                for i in range(parqueadero.filas):
+                    for j in range(parqueadero.columnas):
+                        if j % 2 == 0:
+                            matriz[i][j]['tipo'] = 'parqueo'
+                        else:
+                            matriz[i][j]['tipo'] = 'pasillo'
+
+            elif patron == 'zigzag':
+                for i in range(parqueadero.filas):
+                    for j in range(parqueadero.columnas):
+                        if (i + (j // 2)) % 2 == 0:
+                            matriz[i][j]['tipo'] = 'parqueo'
+                        else:
+                            matriz[i][j]['tipo'] = 'pasillo'
+
+            else:
+                return Response(
+                    {"error": "Patrón no válido. Use 'diagonal', 'linea' o 'zigzag'"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Guardar la matriz actualizada
+            parqueadero.matriz = matriz
+            parqueadero.save()
+
+            return Response({
+                'mensaje': f'Patrón {patron} aplicado correctamente',
+                'matriz': matriz
+            })
+
+        except Exception as e:
+            return Response(
+                {"error": f"Error al aplicar el patrón: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class RellenarAreaMatrizView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def post(self, request, id_parqueadero):
+        try:
+            parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+            
+            # Verificar permisos
+            if request.user != parqueadero.id_propietario:
+                return Response(
+                    {"error": "Solo el propietario puede rellenar áreas"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            tipo = request.data.get('tipo')
+            fila_inicio = request.data.get('fila_inicio')
+            fila_fin = request.data.get('fila_fin')
+            columna_inicio = request.data.get('columna_inicio')
+            columna_fin = request.data.get('columna_fin')
+
+            if None in (tipo, fila_inicio, fila_fin, columna_inicio, columna_fin):
+                return Response(
+                    {"error": "Todos los campos son requeridos"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Validar el tipo de espacio
+            tipos_validos = ['parqueo', 'pasillo', 'obstruccion']
+            if tipo not in tipos_validos:
+                return Response(
+                    {"error": f"Tipo inválido. Debe ser uno de: {', '.join(tipos_validos)}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Validar rangos
+            if not (0 <= fila_inicio <= fila_fin < parqueadero.filas and 
+                    0 <= columna_inicio <= columna_fin < parqueadero.columnas):
+                return Response(
+                    {"error": "Rangos de filas o columnas inválidos"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Obtener la matriz actual
+            matriz = parqueadero.matriz
+            if not matriz:
+                matriz = [[{"nombre": "", "tipo": "pasillo"} for _ in range(parqueadero.columnas)] 
+                         for _ in range(parqueadero.filas)]
+
+            # Rellenar el área seleccionada
+            for i in range(fila_inicio, fila_fin + 1):
+                for j in range(columna_inicio, columna_fin + 1):
+                    matriz[i][j]['tipo'] = tipo
+
+            # Guardar la matriz actualizada
+            parqueadero.matriz = matriz
+            parqueadero.save()
+
+            return Response({
+                'mensaje': 'Área rellenada correctamente',
+                'matriz': matriz
+            })
+
+        except Exception as e:
+            return Response(
+                {"error": f"Error al rellenar el área: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+

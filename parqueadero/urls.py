@@ -8,7 +8,10 @@ from .views import (
     ModificarMatrizParqueaderoView,
     ListaEspaciosDisponiblesView,
     CargarMatrizBaseView,
-    ModificarMatrizView
+    ModificarMatrizView,
+    ValidarEstructuraMatrizView,
+    AplicarPatronMatrizView,
+    RellenarAreaMatrizView
 )
 
 urlpatterns = [
@@ -21,4 +24,7 @@ urlpatterns = [
     path('Espacios-disponibles/<uuid:id_parqueadero>/', ListaEspaciosDisponiblesView.as_view(), name='lista_espacios_disponibles'),
     path('parqueadero/<uuid:id_parqueadero>/matriz/', CargarMatrizBaseView.as_view(), name='cargar-matriz'),
     path('parqueadero/<uuid:id_parqueadero>/modificar-matriz/', ModificarMatrizView.as_view(), name='modificar-matriz'),
+    path('parqueadero/<uuid:id_parqueadero>/validar-estructura/', ValidarEstructuraMatrizView.as_view(), name='validar-estructura'),
+    path('parqueadero/<uuid:id_parqueadero>/aplicar-patron/', AplicarPatronMatrizView.as_view(), name='aplicar-patron'),
+    path('parqueadero/<uuid:id_parqueadero>/rellenar-area/', RellenarAreaMatrizView.as_view(), name='rellenar-area'),
 ]

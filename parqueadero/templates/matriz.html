@@ -222,6 +222,34 @@
         .acciones-seleccion.visible {
             display: block;
         }
+
+        .validacion-resultado {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .validacion-error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .validacion-exito {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .espacio-invalido {
+            animation: parpadeo 1s infinite;
+        }
+
+        @keyframes parpadeo {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -261,6 +289,15 @@
                         <button class="btn btn-relleno btn-herramienta" onclick="rellenarColumna()">Rellenar Columna</button>
                         <div class="instrucciones">Haz clic para activar el modo de selección</div>
                     </div>
+                </div>
+            </div>
+            <!-- Botón de Validación -->
+            <div class="row mt-3">
+                <div class="col-12">
+                    <button class="btn btn-primary" onclick="validarEstructura()">
+                        Validar Estructura
+                    </button>
+                    <div id="validacionResultado" class="validacion-resultado" style="display: none;"></div>
                 </div>
             </div>
             <!-- Acciones para selección múltiple -->
@@ -356,7 +393,7 @@
 
         function rellenarFila() {
             const maxFila = parseInt('{{ parqueadero.filas }}') - 1;
-            const maxColumna = parseInt('{{ parqueadero.columnas }}');
+            const maxColumna = parseInt('{{ parqueadero.columnas }}') - 1;
             const fila = prompt(`Ingresa el número de fila (0-${maxFila}):`);
             
             if (fila !== null) {
@@ -364,10 +401,7 @@
                 if (filaNum >= 0 && filaNum <= maxFila) {
                     mostrarModalEstado(null);
                     ultimoTipoSeleccionado = null;
-                    for (let i = 0; i < maxColumna; i++) {
-                        const celda = document.querySelector(`[data-fila="${filaNum}"][data-columna="${i}"]`);
-                        celdasSeleccionadas.add(celda);
-                    }
+                    rellenarArea(filaNum, 0, filaNum, maxColumna);
                 } else {
                     alert('Número de fila inválido');
                 }
@@ -375,7 +409,7 @@
         }
 
         function rellenarColumna() {
-            const maxFila = parseInt('{{ parqueadero.filas }}');
+            const maxFila = parseInt('{{ parqueadero.filas }}') - 1;
             const maxColumna = parseInt('{{ parqueadero.columnas }}') - 1;
             const columna = prompt(`Ingresa el número de columna (0-${maxColumna}):`);
             
@@ -384,40 +418,66 @@
                 if (columnaNum >= 0 && columnaNum <= maxColumna) {
                     mostrarModalEstado(null);
                     ultimoTipoSeleccionado = null;
-                    for (let i = 0; i < maxFila; i++) {
-                        const celda = document.querySelector(`[data-fila="${i}"][data-columna="${columnaNum}"]`);
-                        celdasSeleccionadas.add(celda);
-                    }
+                    rellenarArea(0, columnaNum, maxFila, columnaNum);
                 } else {
                     alert('Número de columna inválido');
                 }
             }
         }
 
-        function aplicarPatron(tipo) {
-            const maxFila = parseInt('{{ parqueadero.filas }}');
-            const maxColumna = parseInt('{{ parqueadero.columnas }}');
-
-            for (let i = 0; i < maxFila; i++) {
-                for (let j = 0; j < maxColumna; j++) {
-                    let tipoEspacio = 'pasillo';
-                    
-                    switch(tipo) {
-                        case 'diagonal':
-                            if ((i + j) % 2 === 0) tipoEspacio = 'parqueo';
-                            break;
-                        case 'linea':
-                            if (j % 2 === 0) tipoEspacio = 'parqueo';
-                            break;
-                        case 'zigzag':
-                            if ((i + Math.floor(j/2)) % 2 === 0) tipoEspacio = 'parqueo';
-                            break;
-                    }
-                    
-                    const celda = document.querySelector(`[data-fila="${i}"][data-columna="${j}"]`);
-                    cambiarTipoCelda(celda, tipoEspacio);
+        function rellenarArea(filaInicio, columnaInicio, filaFin, columnaFin) {
+            mostrarModalEstado(null);
+            ultimoTipoSeleccionado = null;
+            
+            fetch(`/api/parqueadero/parqueadero/{{ parqueadero.id_parqueadero }}/rellenar-area/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    tipo: 'parqueo', // Por defecto, se puede cambiar en el modal
+                    fila_inicio: filaInicio,
+                    fila_fin: filaFin,
+                    columna_inicio: columnaInicio,
+                    columna_fin: columnaFin
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else {
+                    location.reload(); // Recargar para mostrar los cambios
                 }
-            }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error al rellenar el área');
+            });
+        }
+
+        function aplicarPatron(tipo) {
+            fetch(`/api/parqueadero/parqueadero/{{ parqueadero.id_parqueadero }}/aplicar-patron/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ patron: tipo })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else {
+                    location.reload(); // Recargar para mostrar los cambios
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error al aplicar el patrón');
+            });
         }
 
         function mostrarModalEstado(elemento) {
@@ -523,6 +583,56 @@
             });
 
             limpiarSeleccion();
+        }
+
+        function validarEstructura() {
+            fetch(`/api/parqueadero/parqueadero/{{ parqueadero.id_parqueadero }}/validar-estructura/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const resultadoDiv = document.getElementById('validacionResultado');
+                resultadoDiv.style.display = 'block';
+
+                // Limpiar resaltados anteriores
+                document.querySelectorAll('.espacio').forEach(espacio => {
+                    espacio.classList.remove('espacio-invalido');
+                });
+
+                if (data.valido) {
+                    resultadoDiv.className = 'validacion-resultado validacion-exito';
+                    resultadoDiv.innerHTML = '<strong>✓ Estructura válida:</strong> La configuración del parqueadero es correcta.';
+                } else {
+                    resultadoDiv.className = 'validacion-resultado validacion-error';
+                    resultadoDiv.innerHTML = `
+                        <strong>✗ Se encontraron ${data.errores.length} problemas:</strong>
+                        <ul>
+                            ${data.errores.map(error => `<li>${error.mensaje}</li>`).join('')}
+                        </ul>
+                    `;
+
+                    // Resaltar espacios inválidos
+                    data.espacios_invalidos.forEach(espacio => {
+                        const celda = document.querySelector(
+                            `[data-fila="${espacio.fila}"][data-columna="${espacio.columna}"]`
+                        );
+                        if (celda) {
+                            celda.classList.add('espacio-invalido');
+                        }
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                const resultadoDiv = document.getElementById('validacionResultado');
+                resultadoDiv.style.display = 'block';
+                resultadoDiv.className = 'validacion-resultado validacion-error';
+                resultadoDiv.innerHTML = '<strong>✗ Error:</strong> No se pudo validar la estructura.';
+            });
         }
 
         document.getElementById('modalBackdrop').addEventListener('click', cerrarModal);
