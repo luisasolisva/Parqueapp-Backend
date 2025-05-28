@@ -41,8 +41,13 @@ class ParqueaderosCercanosView(APIView):
         parqueaderos_dist.sort(key=lambda x: x[0])  # ordenar por distancia
         parqueaderos_cercanos = [p[1] for p in parqueaderos_dist[:10]]  # los 10 más cercanos
 
-        serializer = ParqueaderoSerializer(parqueaderos_cercanos, many=True)
-        return Response(serializer.data)
+        resultado = []
+        for distancia, parqueadero in parqueaderos_cercanos:
+            data = ParqueaderoSerializer(parqueadero).data
+            data['distancia_km'] = round(distancia, 2)  # agregar campo calculado
+            resultado.append(data)
+
+        return Response(resultado)
 
 
 
