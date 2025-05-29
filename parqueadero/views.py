@@ -18,36 +18,53 @@ def calcular_distancia(lat1, lon1, lat2, lon2):
     c = 2 * asin(sqrt(a))
     return R * c
 
+from django.db.models import Q
+
 class ParqueaderosCercanosView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         lat = request.data.get("lat")
         lng = request.data.get("lng")
+        busqueda = request.data.get("busqueda")  # Texto ingresado manualmente
 
-        if lat is None or lng is None:
-            return Response({"error": "Se requieren lat y lng"}, status=400)
+        if lat and lng:
+            parqueaderos = Parqueadero.objects.all()
+            parqueaderos_dist = []
 
-        parqueaderos = Parqueadero.objects.all()
-        parqueaderos_dist = []
+            for parqueadero in parqueaderos:
+                distancia = calcular_distancia(
+                    float(lat), float(lng),
+                    float(parqueadero.latitud), float(parqueadero.longitud)
+                )
+                parqueaderos_dist.append((distancia, parqueadero))
 
-        for parqueadero in parqueaderos:
-            distancia = calcular_distancia(
-                float(lat), float(lng),
-                float(parqueadero.latitud), float(parqueadero.longitud)
+            parqueaderos_dist.sort(key=lambda x: x[0])
+            parqueaderos_cercanos = parqueaderos_dist[:10]
+
+            resultado = []
+            for distancia, parqueadero in parqueaderos_cercanos:
+                data = ParqueaderoSerializer(parqueadero).data
+                data['distancia_km'] = round(distancia, 2)
+                resultado.append(data)
+
+            return Response(resultado)
+
+        elif busqueda:
+            parqueaderos = Parqueadero.objects.filter(
+                Q(nombre__icontains=busqueda) |
+                Q(ciudad__icontains=busqueda)
             )
-            parqueaderos_dist.append((distancia, parqueadero))
 
-        parqueaderos_dist.sort(key=lambda x: x[0])  # ordenar por distancia
-        parqueaderos_cercanos = [p[1] for p in parqueaderos_dist[:10]]  # los 10 más cercanos
+            serializer = ParqueaderoSerializer(parqueaderos, many=True)
+            return Response(serializer.data)
 
-        resultado = []
-        for distancia, parqueadero in parqueaderos_cercanos:
-            data = ParqueaderoSerializer(parqueadero).data
-            data['distancia_km'] = round(distancia, 2)  # agregar campo calculado
-            resultado.append(data)
+        else:
+            return Response({
+                "error": "Se requieren coordenadas o un término de búsqueda por nombre o ciudad."
+            }, status=400)
 
-        return Response(resultado)
+    
 
 
 
