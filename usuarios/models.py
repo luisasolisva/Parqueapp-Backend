@@ -76,7 +76,6 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
 
 
 
-
 class Parqueadero(models.Model):
     id_parqueadero = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     nombre = models.CharField(max_length=200)
@@ -85,15 +84,10 @@ class Parqueadero(models.Model):
     latitud = models.DecimalField(max_digits=9, decimal_places=6)
     longitud = models.DecimalField(max_digits=9, decimal_places=6)
     capacidad_total = models.IntegerField()
-    capacidad_disponible = models.IntegerField()
-    precio_hora = models.DecimalField(max_digits=10, decimal_places=2)
+    precio_hora = models.DecimalField(max_digits=10, decimal_places=3)
     nombre_propietario = models.CharField(max_length=200) 
-    id_propietario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='parqueadero_set_usuarios')
     descripcion = models.TextField(blank=True, null=True) 
-    filas = models.IntegerField()
-    columnas = models.IntegerField()
-
-    matriz = models.JSONField(default=list)
+    
 
     def __str__(self):
         return self.nombre
@@ -110,10 +104,11 @@ class EspacioParqueadero(models.Model):
     id_parqueadero = models.ForeignKey(Parqueadero, on_delete=models.CASCADE)
     numero_espacio = models.CharField(max_length=50)
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
+    fila = models.IntegerField(null=False) 
+    columna = models.IntegerField(null=False)
 
     def __str__(self):
         return f'Espacio {self.numero_espacio} en {self.id_parqueadero.nombre}'
-
 
 class Reserva(models.Model):
     ESTADO_CHOICES = [
