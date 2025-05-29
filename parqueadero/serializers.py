@@ -49,3 +49,13 @@ class RegistrarParqueaderoSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         return Parqueadero.objects.create(**validated_data)
+
+
+
+
+class EstadisticasAdminSerializer(serializers.Serializer):
+    total_clientes = serializers.IntegerField()
+    total_reservas = serializers.IntegerField()
+    reservas_confirmadas = serializers.IntegerField()
+    reservas_canceladas = serializers.IntegerField()
+    ingresos_totales = serializers.DecimalField(max_digits=10, decimal_places=2)

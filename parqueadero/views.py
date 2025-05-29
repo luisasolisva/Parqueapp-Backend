@@ -318,3 +318,36 @@ class GuardarEspaciosDisponiblesView(APIView):
             "id_parqueadero": str(parqueadero.id_parqueadero),
             "espacios_disponibles": nuevos_espacios
         }, status=status.HTTP_200_OK)
+
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from django.db.models import Sum
+from usuarios.models import Parqueadero
+from usuarios.models import Usuario
+from usuarios.models import Reserva
+from parqueadero.serializers import EstadisticasAdminSerializer
+
+class EstadisticasAdminView(APIView):
+    def get(self, request, id_parqueadero):
+        parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+
+        total_clientes = Usuario.objects.filter(reserva__id_parqueadero=parqueadero).distinct().count()  # ✅ Corregida la consulta
+        total_reservas = Reserva.objects.filter(id_parqueadero=parqueadero).count()
+        reservas_confirmadas = Reserva.objects.filter(id_parqueadero=parqueadero, estado="Confirmada").count()
+        reservas_canceladas = Reserva.objects.filter(id_parqueadero=parqueadero, estado="Cancelada").count()
+        ingresos_totales = Reserva.objects.filter(id_parqueadero=parqueadero, estado="Confirmada").aggregate(Sum("monto_total"))["monto_total__sum"] or 0
+
+        data = {
+            "total_clientes": total_clientes,
+            "total_reservas": total_reservas,
+            "reservas_confirmadas": reservas_confirmadas,
+            "reservas_canceladas": reservas_canceladas,
+            "ingresos_totales": ingresos_totales
+        }
+
+        serializer = EstadisticasAdminSerializer(data)  # ✅ Se asegura que reciba un diccionario
+        return Response(serializer.data, status=status.HTTP_200_OK)
