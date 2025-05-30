@@ -73,9 +73,9 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f'{self.nombre} {self.apellido}'
+    
 
-
-
+from cloudinary.models import CloudinaryField
 class Parqueadero(models.Model):
     id_parqueadero = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     nombre = models.CharField(max_length=200)
@@ -87,7 +87,7 @@ class Parqueadero(models.Model):
     precio_hora = models.DecimalField(max_digits=10, decimal_places=3)
     nombre_propietario = models.CharField(max_length=200) 
     descripcion = models.TextField(blank=True, null=True) 
-    
+    imagenes = models.ManyToManyField('ImagenParqueadero', blank=True, related_name="lista_de_imagenes")  # ✅ Usa comillas para evitar NameError    
 
     def __str__(self):
         return self.nombre
@@ -190,3 +190,8 @@ class Cancelacion(models.Model):
 
     def __str__(self):
         return f'Cancelación {self.id_cancelacion} de {self.id_reserva}'
+
+class ImagenParqueadero(models.Model):
+    id_imagen = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    parqueadero = models.ForeignKey('Parqueadero', on_delete=models.CASCADE, related_name="imagenes_del_parqueadero")  # ✅ Evita NameError
+    imagen = CloudinaryField("imagen") 

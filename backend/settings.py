@@ -288,3 +288,13 @@ CHANNEL_LAYERS = {
 
 
 #SECRET_KEY = config('SECRET_KEY')
+
+import cloudinary
+import cloudinary.uploader
+import cloudinary.models
+
+cloudinary.config(
+    cloud_name="dgktoozdm",
+    api_key="946841153651718",
+    api_secret="EjEugnnqQ5QAGA-4zHU0DjXjPZA"
+)

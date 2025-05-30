@@ -59,3 +59,12 @@ class EstadisticasAdminSerializer(serializers.Serializer):
     reservas_confirmadas = serializers.IntegerField()
     reservas_canceladas = serializers.IntegerField()
     ingresos_totales = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+
+from rest_framework import serializers
+from usuarios.models import ImagenParqueadero
+
+class ImagenParqueaderoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ImagenParqueadero
+        fields = ["id_imagen", "imagen"]

@@ -351,3 +351,59 @@ class EstadisticasAdminView(APIView):
 
         serializer = EstadisticasAdminSerializer(data)  # ✅ Se asegura que reciba un diccionario
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+
+
+from rest_framework.views import APIView
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from usuarios.models import Parqueadero, ImagenParqueadero
+from parqueadero.serializers import ImagenParqueaderoSerializer
+import cloudinary.uploader
+class SubirImagenesParqueaderoView(APIView):
+    parser_classes = (MultiPartParser, FormParser)  # ✅ Permite manejar archivos
+
+    def post(self, request, id_parqueadero):
+        parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+
+        if request.user.tipo_usuario != "Admin":
+            return Response({"error": "Solo administradores pueden subir imágenes"}, status=status.HTTP_403_FORBIDDEN)
+
+        imagenes = request.FILES.getlist("imagenes")  # ✅ Permitir múltiples imágenes
+
+        if not imagenes:
+            return Response({"error": "Debes subir al menos una imagen"}, status=status.HTTP_400_BAD_REQUEST)
+
+        urls_imagenes = []
+        for imagen in imagenes:
+            # ✅ Validar formato y tamaño antes de subir
+            error = validar_imagen(imagen)
+            if error:
+                return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
+
+            resultado = cloudinary.uploader.upload(imagen)
+            nueva_imagen = ImagenParqueadero.objects.create(parqueadero=parqueadero, imagen=resultado["url"])
+            urls_imagenes.append(nueva_imagen.imagen) 
+
+        serializer = ImagenParqueaderoSerializer(ImagenParqueadero.objects.filter(parqueadero=parqueadero), many=True)
+
+        return Response({"message": "Imágenes subidas correctamente", "imagenes": serializer.data}, status=status.HTTP_201_CREATED)
+
+
+
+EXTENSIONES_PERMITIDAS = ["jpg", "jpeg", "png"]
+TAMANIO_MAXIMO_MB = 5  # Limite de tamaño en MB
+
+def validar_imagen(imagen):
+    extension = imagen.name.split(".")[-1].lower()
+    if extension not in EXTENSIONES_PERMITIDAS:
+        return "Formato no permitido. Solo JPG, JPEG y PNG."
+    
+    if imagen.size > TAMANIO_MAXIMO_MB * 1024 * 1024:
+        return f"Imagen demasiado grande. Máximo {TAMANIO_MAXIMO_MB}MB."
+
+    return None
