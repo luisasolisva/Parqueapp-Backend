@@ -25,40 +25,94 @@ class MatrizSerializer(serializers.ModelSerializer):
         model = Parqueadero
         fields = ['id_parqueadero', 'matriz']
 
+class EspacioDisponibleSerializer(serializers.Serializer):
+    fila = serializers.IntegerField()
+    columna = serializers.IntegerField()
+    espacio = serializers.CharField(max_length=50)  # Nombre del espacio
+    estado = serializers.ChoiceField(choices=["Disponible", "Ocupado", "Fuera_de_servicio"])
 
 
+import cloudinary
+import cloudinary.uploader
 
-class ParqueaderoSerializer(serializers.ModelSerializer):
-    id_propietario = serializers.ReadOnlyField(source='id_propietario.email')  # Solo para mostrar
+from rest_framework import serializers
+from usuarios.models import Parqueadero
+from parqueadero.utils import validar_imagen
+
+class RegistrarParqueaderoSerializer(serializers.ModelSerializer):
+    imagenes = serializers.ImageField(required=False)  # ✅ Permitir una imagen opcional
 
     class Meta:
         model = Parqueadero
-        exclude = ['matriz']  # Excluir matriz del formulario
+        fields = ['nombre', 'direccion', 'ciudad', 'latitud', 'longitud', 'precio_hora', 'nombre_propietario', 'descripcion', 'imagenes']
 
-    def validate(self, data):
-        user = self.context['request'].user
-        if user.tipo_usuario != 'Admin':
-            raise serializers.ValidationError("Solo los administradores pueden crear parqueaderos.")
-        return data
+    def validate_imagenes(self, imagen):
+        error = validar_imagen(imagen)  # ✅ Validación ANTES de procesar la creación
+        if error:
+            raise serializers.ValidationError(error)
+        return imagen
 
     def create(self, validated_data):
-        user = self.context['request'].user
+        request = self.context.get('request')  # ✅ Obtener el usuario autenticado
+        if not request or not request.user.is_authenticated:
+            raise serializers.ValidationError("Debes estar autenticado para registrar un parqueadero.")
 
-        filas = validated_data.pop('filas', None)
-        columnas = validated_data.pop('columnas', None)
+        imagen = validated_data.pop("imagenes", None)
 
-        if filas is None or columnas is None:
-            raise serializers.ValidationError("Los campos filas y columnas son obligatorios.")
+        # ✅ Validar imagen antes de crear el parqueadero
+        if imagen:
+            error = validar_imagen(imagen)
+            if error:
+                raise serializers.ValidationError(error)  # ✅ Evita que el parqueadero se cree si la imagen falla
 
-        matriz = [
-            [{"nombre": "", "estado": ""} for _ in range(columnas)]  # Estado y nombre vacíos
-            for _ in range(filas)
-        ]
+        # ✅ Crear el parqueadero asociándolo al Admin que lo registra
+        parqueadero = Parqueadero.objects.create(propietario=request.user, **validated_data)
 
-        validated_data['matriz'] = matriz
+        # ✅ Subir imagen solo si pasó la validación
+        imagen_url = None
+        if imagen:
+            resultado = cloudinary.uploader.upload(imagen)
+            ImagenParqueadero.objects.create(parqueadero=parqueadero, imagen=resultado["url"])
+            imagen_url = resultado["url"]
 
-        # Asignar propietario actual
-        validated_data['id_propietario'] = user
+        # ✅ Retornar todos los datos junto con la imagen
+        parqueadero_data = RegistrarParqueaderoSerializer(parqueadero).data
+        parqueadero_data["imagenes"] = imagen_url  
 
-        # Crear el parqueadero
-        return Parqueadero.objects.create(filas=filas, columnas=columnas, **validated_data)
+        return parqueadero_data
+
+class EstadisticasAdminSerializer(serializers.Serializer):
+    total_clientes = serializers.IntegerField()
+    total_reservas = serializers.IntegerField()
+    reservas_confirmadas = serializers.IntegerField()
+    reservas_canceladas = serializers.IntegerField()
+    ingresos_totales = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+
+from rest_framework import serializers
+from usuarios.models import ImagenParqueadero
+
+class ImagenParqueaderoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ImagenParqueadero
+        fields = ["id_imagen", "imagen"]
+
+
+
+
+class ParqueaderoDetailSerializer(serializers.ModelSerializer):
+    imagenes = serializers.SerializerMethodField()  # ✅ Convertir imágenes en URLs serializables
+
+    class Meta:
+        model = Parqueadero
+        fields = ['id_parqueadero', 'nombre', 'direccion', 'ciudad', 'latitud', 'longitud', 'precio_hora', 'nombre_propietario', 'descripcion', 'imagenes']
+
+    def get_imagenes(self, obj):
+        return [str(imagen.imagen) for imagen in ImagenParqueadero.objects.filter(parqueadero=obj) if imagen.imagen]  # ✅ Convertir a string y filtrar valores vacíos
+
+
+
+class EliminarParqueaderoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Parqueadero
+        fields = ['id_parqueadero', 'nombre', 'direccion', 'ciudad']  # ✅ Mostrar algunos detalles antes de eliminar

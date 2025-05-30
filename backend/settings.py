@@ -134,10 +134,10 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# DATABASES = {
+#DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',  
+#        'NAME': BASE_DIR / 'db.sqlite3',  
 #     }
 # }
 
@@ -149,9 +149,8 @@ DATABASES = {
         'PASSWORD': '12345678',# contraseña de MySQL
         'HOST': 'localhost',
         'PORT': '3306',
-    }
 }
-
+}
 
 # PRODUCTION
 # DATABASES = {
@@ -292,3 +291,13 @@ CHANNEL_LAYERS = {
 
 
 #SECRET_KEY = config('SECRET_KEY')
+
+import cloudinary
+import cloudinary.uploader
+import cloudinary.models
+
+cloudinary.config(
+    cloud_name="dgktoozdm",
+    api_key="946841153651718",
+    api_secret="EjEugnnqQ5QAGA-4zHU0DjXjPZA"
+)

@@ -7,6 +7,7 @@ from .serializers import ParqueaderoSerializer
 from usuarios.models import Parqueadero
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from .models import CambioMatriz
 
 def calcular_distancia(lat1, lon1, lat2, lon2):
     # Fórmula Haversine
@@ -17,31 +18,53 @@ def calcular_distancia(lat1, lon1, lat2, lon2):
     c = 2 * asin(sqrt(a))
     return R * c
 
+from django.db.models import Q
+
 class ParqueaderosCercanosView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         lat = request.data.get("lat")
         lng = request.data.get("lng")
+        busqueda = request.data.get("busqueda")  # Texto ingresado manualmente
 
-        if lat is None or lng is None:
-            return Response({"error": "Se requieren lat y lng"}, status=400)
+        if lat and lng:
+            parqueaderos = Parqueadero.objects.all()
+            parqueaderos_dist = []
 
-        parqueaderos = Parqueadero.objects.all()
-        parqueaderos_dist = []
+            for parqueadero in parqueaderos:
+                distancia = calcular_distancia(
+                    float(lat), float(lng),
+                    float(parqueadero.latitud), float(parqueadero.longitud)
+                )
+                parqueaderos_dist.append((distancia, parqueadero))
 
-        for parqueadero in parqueaderos:
-            distancia = calcular_distancia(
-                float(lat), float(lng),
-                float(parqueadero.latitud), float(parqueadero.longitud)
+            parqueaderos_dist.sort(key=lambda x: x[0])
+            parqueaderos_cercanos = parqueaderos_dist[:10]
+
+            resultado = []
+            for distancia, parqueadero in parqueaderos_cercanos:
+                data = ParqueaderoSerializer(parqueadero).data
+                data['distancia_km'] = round(distancia, 2)
+                resultado.append(data)
+
+            return Response(resultado)
+
+        elif busqueda:
+            parqueaderos = Parqueadero.objects.filter(
+                Q(nombre__icontains=busqueda) |
+                Q(ciudad__icontains=busqueda)
             )
-            parqueaderos_dist.append((distancia, parqueadero))
 
-        parqueaderos_dist.sort(key=lambda x: x[0])  # ordenar por distancia
-        parqueaderos_cercanos = [p[1] for p in parqueaderos_dist[:10]]  # los 10 más cercanos
+            serializer = ParqueaderoSerializer(parqueaderos, many=True)
+            return Response(serializer.data)
 
-        serializer = ParqueaderoSerializer(parqueaderos_cercanos, many=True)
-        return Response(serializer.data)
+        else:
+            return Response({
+                "error": "Se requieren coordenadas o un término de búsqueda por nombre o ciudad."
+            }, status=400)
+
+    
 
 
 
@@ -50,7 +73,7 @@ from django.contrib.auth.decorators import login_required
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from usuarios.models import Parqueadero
-from .serializers import ParqueaderoSerializer
+from .serializers import RegistrarParqueaderoSerializer
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from usuarios.models import Parqueadero
@@ -59,27 +82,25 @@ from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
+import cloudinary
+import cloudinary.uploader
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from .permissions import IsAdminUser
+from rest_framework.parsers import MultiPartParser, FormParser
+from parqueadero.utils import validar_imagen  
 
-
-
-class CrearParqueaderoView(GenericAPIView):
+class RegistrarParqueaderoView(GenericAPIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
-    serializer_class = ParqueaderoSerializer
+    serializer_class = RegistrarParqueaderoSerializer
 
     def post(self, request):
-        serializer = self.get_serializer(data=request.data, context={'request': request})
+        serializer = self.get_serializer(data=request.data, context={'request': request})  # ✅ Pasar el usuario en el contexto
         if serializer.is_valid():
             parqueadero = serializer.save()
-            parqueadero_data = ParqueaderoSerializer(parqueadero, context={'request': request}).data
-            return Response({
-                "message": "Parqueadero creado exitosamente.",
-                "parqueadero": parqueadero_data
-            }, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "Parqueadero registrado exitosamente.", "parqueadero": serializer.data}, status=status.HTTP_201_CREATED)
 
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 
@@ -97,8 +118,6 @@ def lista_parqueaderos(request):
         'ciudad': p.ciudad,
         'latitud': float(p.latitud),
         'longitud': float(p.longitud),
-        'capacidad_total': p.capacidad_total,
-        'capacidad_disponible': p.capacidad_disponible,
         'precio_hora': float(p.precio_hora),
         'nombre_propietario': p.nombre_propietario,  # Eliminado el espacio y paréntesis extra
         'descripcion': p.descripcion,  # Eliminado el paréntesis extra
@@ -122,99 +141,73 @@ from rest_framework import status
 from .permissions import IsAdminUser
 from usuarios.models import Parqueadero
 
-class ModificarMatrizParqueaderoView(APIView):
+class ModificarEspaciosParqueaderoView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
-    def get(self, request, id_parqueadero):
-        parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
-        
-        # Bloquear si el usuario no es admin
-        if request.user.tipo_usuario != "Admin":
-            return Response({"error": "Solo administradores pueden acceder"}, status=status.HTTP_403_FORBIDDEN)
-
-        # Bloquear si el usuario no es el propietario del parqueadero
-        if request.user != parqueadero.id_propietario:
-            return Response({"error": "Solo el administrador propietario puede modificar esta matriz"}, status=status.HTTP_403_FORBIDDEN)
-
-        return Response({"matriz": parqueadero.matriz}, status=status.HTTP_200_OK)
-
-    def post(self, request, id_parqueadero):
+    def put(self, request, id_parqueadero):
         parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
 
-        # Bloquear si el usuario no es admin
+        # Validar permisos
         if request.user.tipo_usuario != "Admin":
-            return Response({"error": "Solo administradores pueden modificar esta matriz"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "Solo administradores pueden modificar los espacios"}, status=status.HTTP_403_FORBIDDEN)
 
-        # Bloquear si el usuario no es el propietario del parqueadero
-        if request.user != parqueadero.id_propietario:
-            return Response({"error": "Solo el administrador propietario puede modificar esta matriz"}, status=status.HTTP_403_FORBIDDEN)
+        espacios_modificados = request.data.get("espacios_disponibles", [])
 
-        # Asegurar que los datos vienen en `request.data`
-        cambios = request.data.get("cambios")
-        if not cambios:
-            return Response({"error": "Los cambios son requeridos"}, status=status.HTTP_400_BAD_REQUEST)
+        if not espacios_modificados:
+            return Response({"error": "Debes proporcionar al menos un espacio a modificar"}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            fila_idx = cambios.get("fila")
-            columna_idx = cambios.get("columna")
-            nuevo_nombre = cambios.get("nombre")
-            nuevo_estado = cambios.get("estado")
+        # Obtener los espacios actuales en la base de datos
+        espacios_actuales = EspacioParqueadero.objects.filter(id_parqueadero=parqueadero)
 
-            # Validar índices
-            if fila_idx is None or columna_idx is None:
-                return Response({"error": "Fila y columna son obligatorias"}, status=status.HTTP_400_BAD_REQUEST)
+        # Validar que el espacio realmente existe antes de modificarlo
+        for modificado in espacios_modificados:
+            espacio_db = espacios_actuales.filter(numero_espacio=modificado["espacio"]).first()
 
-            if nuevo_estado not in ["Disponible", "Ocupado", "Fuera_de_servicio"]:
-                return Response({"error": "Estado inválido. Solo se permite Disponible, Ocupado o Fuera de servicio"}, status=status.HTTP_400_BAD_REQUEST)
+            if not espacio_db:
+                return Response({"error": f"El espacio '{modificado['espacio']}' no existe en el parqueadero."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Modificar solo el espacio especificado
-            parqueadero.matriz[fila_idx][columna_idx]["nombre"] = nuevo_nombre if nuevo_nombre is not None else ""
-            parqueadero.matriz[fila_idx][columna_idx]["estado"] = nuevo_estado
+            # Modificar estado del espacio
+            espacio_db.estado = modificado["estado"]
+            espacio_db.save()
 
-            parqueadero.save()
-
-            # Enviar actualización por WebSocket
-            channel_layer = get_channel_layer()
-            async_to_sync(channel_layer.group_send)(
-                "parqueadero_group",
-                {
-                    "type": "parqueadero_message",
-                    "message": {
-                        "id_parqueadero": str(parqueadero.id_parqueadero),
-                        "matriz": parqueadero.matriz
-                    }
-                }
-            )
-
-            return Response({"message": "Matriz actualizada correctamente", "matriz": parqueadero.matriz}, status=status.HTTP_200_OK)
-
-        except (IndexError, TypeError):
-            return Response({"error": "Posición inválida en la matriz"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            "message": "Espacios modificados correctamente.",
+            "espacios_disponibles": list(espacios_actuales.values("numero_espacio", "estado"))
+        }, status=status.HTTP_200_OK)
 
 
 
 
 
-from django.shortcuts import render, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.utils.decorators import method_decorator
-from django.views import View
-from usuarios.models import Parqueadero
-from django.http import HttpResponse
 
 
-@method_decorator(login_required, name='dispatch')
-class VerMatrizParqueaderoView(View):
+class VerEspaciosParqueaderoView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]  # Solo admins pueden acceder
+
     def get(self, request, id_parqueadero):
         parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
 
-        # Validación de permisos
-        if request.user != parqueadero.id_propietario and getattr(request.user, 'tipo_usuario', '') != 'Admin':
-            return render(request, 'no_autorizado.html', {'mensaje': 'No tienes permiso para ver la matriz.'})
+        # Validar permisos
+        if request.user.tipo_usuario != "Admin":
+            return Response({"error": "Solo administradores pueden ver los espacios."}, status=status.HTTP_403_FORBIDDEN)
 
-        return render(request, 'matriz.html', {'matriz': parqueadero.matriz, 'parqueadero': parqueadero})
+        # Obtener los espacios del parqueadero
+        espacios = EspacioParqueadero.objects.filter(id_parqueadero=parqueadero)
 
+        if not espacios.exists():
+            return Response({"error": "Este parqueadero no tiene espacios registrados."}, status=status.HTTP_404_NOT_FOUND)
 
+        # Serializar los datos
+        espacios_disponibles = [
+            {
+                "id_espacio": str(espacio.id_espacio),
+                "numero_espacio": espacio.numero_espacio,
+                "estado": espacio.estado
+            }
+            for espacio in espacios
+        ]
+
+        return Response({"espacios_parqueadero": espacios_disponibles}, status=status.HTTP_200_OK)
 
 
 
@@ -234,11 +227,7 @@ class ModificarParqueaderoView(GenericAPIView):
 
     def put(self, request, id_parqueadero):
         parqueadero = self.get_object()
-
-        # Filtrar los datos para evitar la modificación de `filas` y `columnas`
-        datos_modificables = {k: v for k, v in request.data.items() if k not in ['filas', 'columnas']}
-
-        serializer = self.get_serializer(parqueadero, data=datos_modificables, context={'request': request}, partial=True)
+        serializer = self.get_serializer(parqueadero, data=request.data, context={'request': request}, partial=True)
         if serializer.is_valid():
             parqueadero = serializer.save()
             parqueadero_data = ParqueaderoSerializer(parqueadero, context={'request': request}).data
@@ -247,35 +236,138 @@ class ModificarParqueaderoView(GenericAPIView):
                 "parqueadero": parqueadero_data
             }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    
+    
+    
+    
+    
+    
+    
+    
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
-from usuarios.models import Parqueadero
-
+from usuarios.models import EspacioParqueadero
 class ListaEspaciosDisponiblesView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, id_parqueadero):
-        # Bloquear acceso si el usuario no es un cliente
+        # Validar acceso solo para clientes
         if request.user.tipo_usuario != "Cliente":
             return Response({"error": "Solo los clientes pueden ver los espacios disponibles"}, status=status.HTTP_403_FORBIDDEN)
 
         parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
-        
-        espacios_disponibles = []
-        for fila_idx, fila in enumerate(parqueadero.matriz):
-            for columna_idx, celda in enumerate(fila):
-                if celda["estado"] == "Disponible":
-                    espacios_disponibles.append({
-                        "id_espacio": f"{parqueadero.id_parqueadero}-{fila_idx}-{columna_idx}",
-                        "fila": fila_idx,
-                        "columna": columna_idx,
-                        "nombre": celda["nombre"]
-                    })
 
-        return Response({"espacios_disponibles": espacios_disponibles}, status=status.HTTP_200_OK)
+        # Obtener los espacios disponibles desde el modelo `EspacioParqueadero`
+        espacios_disponibles = EspacioParqueadero.objects.filter(id_parqueadero=parqueadero, estado="Disponible")
 
+        # Serializar los datos para enviarlos como respuesta
+        data = [{
+            "id_espacio": str(espacio.id_espacio),
+            "numero_espacio": espacio.numero_espacio,
+            "estado": espacio.estado
+        } for espacio in espacios_disponibles]
+
+        return Response({"espacios_disponibles": data}, status=status.HTTP_200_OK)
+
+
+
+
+
+
+
+class GuardarEspaciosDisponiblesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, id_parqueadero):
+        parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+
+        if request.user.tipo_usuario != "Admin":
+            return Response({"error": "Solo administradores pueden modificar los espacios"}, status=status.HTTP_403_FORBIDDEN)
+
+        nuevos_espacios = request.data.get("espacios_disponibles", [])
+
+        if not nuevos_espacios:
+            return Response({"error": "Debes proporcionar al menos un espacio"}, status=status.HTTP_400_BAD_REQUEST)
+
+        for espacio in nuevos_espacios:
+            print("Espacio recibido:", espacio)  # 👀 Verifica qué datos llegan a la API
+
+            if not all(key in espacio for key in ["fila", "columna", "espacio", "estado"]):
+                return Response({"error": "Cada espacio debe incluir fila, columna, espacio y estado"}, status=status.HTTP_400_BAD_REQUEST)
+
+            EspacioParqueadero.objects.create(
+                id_parqueadero=parqueadero,
+                numero_espacio=espacio["espacio"],
+                fila=espacio["fila"],
+                columna=espacio["columna"],
+                estado=espacio["estado"]
+            )
+
+        return Response({
+            "message": "Espacios guardados correctamente.",
+            "id_parqueadero": str(parqueadero.id_parqueadero),
+            "espacios_disponibles": nuevos_espacios
+        }, status=status.HTTP_200_OK)
+
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from django.db.models import Sum
+from usuarios.models import Parqueadero
+from usuarios.models import Usuario
+from usuarios.models import Reserva
+from parqueadero.serializers import EstadisticasAdminSerializer
+
+class EstadisticasAdminView(APIView):
+    def get(self, request, id_parqueadero):
+        parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+
+        total_clientes = Usuario.objects.filter(reserva__id_parqueadero=parqueadero).distinct().count()  # ✅ Corregida la consulta
+        total_reservas = Reserva.objects.filter(id_parqueadero=parqueadero).count()
+        reservas_confirmadas = Reserva.objects.filter(id_parqueadero=parqueadero, estado="Confirmada").count()
+        reservas_canceladas = Reserva.objects.filter(id_parqueadero=parqueadero, estado="Cancelada").count()
+        ingresos_totales = Reserva.objects.filter(id_parqueadero=parqueadero, estado="Confirmada").aggregate(Sum("monto_total"))["monto_total__sum"] or 0
+
+        data = {
+            "total_clientes": total_clientes,
+            "total_reservas": total_reservas,
+            "reservas_confirmadas": reservas_confirmadas,
+            "reservas_canceladas": reservas_canceladas,
+            "ingresos_totales": ingresos_totales
+        }
+
+        serializer = EstadisticasAdminSerializer(data)  # ✅ Se asegura que reciba un diccionario
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+from .serializers import ParqueaderoDetailSerializer
+
+
+class ParqueaderoDetailView(APIView):
+    permission_classes = [IsAuthenticated]  # ✅ Solo usuarios autenticados pueden ver detalles
+
+    def get(self, request, id_parqueadero):
+        parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+        serializer = ParqueaderoDetailSerializer(parqueadero)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+class EliminarParqueaderoView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]  # ✅ Solo admins autenticados pueden eliminar
+
+    def delete(self, request, id_parqueadero):
+        parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+
+        # ✅ Verificar que el usuario autenticado sea el propietario real
+        if parqueadero.propietario != request.user:  # 🔥 Comparar por ForeignKey, no por texto
+            return Response({"error": "No puedes eliminar un parqueadero que no te pertenece."}, status=status.HTTP_403_FORBIDDEN)
+
+        parqueadero.delete()
+        return Response({"message": "Parqueadero eliminado correctamente."}, status=status.HTTP_200_OK)
 
