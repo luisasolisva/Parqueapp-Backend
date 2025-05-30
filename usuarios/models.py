@@ -83,9 +83,9 @@ class Parqueadero(models.Model):
     ciudad = models.CharField(max_length=100)
     latitud = models.DecimalField(max_digits=9, decimal_places=6)
     longitud = models.DecimalField(max_digits=9, decimal_places=6)
-    capacidad_total = models.IntegerField()
     precio_hora = models.DecimalField(max_digits=10, decimal_places=3)
     nombre_propietario = models.CharField(max_length=200) 
+    propietario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
     descripcion = models.TextField(blank=True, null=True) 
     imagenes = models.ManyToManyField('ImagenParqueadero', blank=True, related_name="lista_de_imagenes")  # ✅ Usa comillas para evitar NameError    
 

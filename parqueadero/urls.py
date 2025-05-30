@@ -1,8 +1,8 @@
 from django.urls import path
 from .views import ParqueaderosCercanosView
 from .views import RegistrarParqueaderoView, lista_parqueaderos
-from .views import ModificarParqueaderoView, VerEspaciosParqueaderoView
-from .views import  ListaEspaciosDisponiblesView, GuardarEspaciosDisponiblesView, ModificarEspaciosParqueaderoView, EstadisticasAdminView, SubirImagenesParqueaderoView
+from .views import ModificarParqueaderoView, VerEspaciosParqueaderoView,EliminarParqueaderoView
+from .views import  ListaEspaciosDisponiblesView, GuardarEspaciosDisponiblesView, ModificarEspaciosParqueaderoView, EstadisticasAdminView, ParqueaderoDetailView
 from . import views
 
 
@@ -15,7 +15,9 @@ urlpatterns = [
     path('Guardar_espacios/<uuid:id_parqueadero>/', GuardarEspaciosDisponiblesView.as_view(), name='Guardar_espacios'),
     path('Modificar_espacios/', ModificarEspaciosParqueaderoView.as_view(), name='modificar_espacios_parqueadero'),
     path('Ver_espacios/', VerEspaciosParqueaderoView.as_view(), name='ver_espacios'),
-    path('Estadisticas/<uuid:id_parqueadero>/', EstadisticasAdminView.as_view(), name='estadisticas_admin'),
-    path('Subir_imagenes/<uuid:id_parqueadero>/', SubirImagenesParqueaderoView.as_view(), name='subir_imagenes_parqueadero'),
+    path('Estadisticas/<uuid:id_parqueadero>/', EstadisticasAdminView.as_view(), name='Estadisticas'),
+    path('Detalles_parqueadero/<uuid:id_parqueadero>/', ParqueaderoDetailView.as_view(), name='parqueadero_detalle'),
+    path('Eliminar_parqueadero/<uuid:id_parqueadero>/', EliminarParqueaderoView.as_view(), name='Eliminar_parqueadero'),
 
+    
 ]
