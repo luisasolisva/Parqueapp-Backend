@@ -227,3 +227,36 @@ class UserUpdateView(generics.UpdateAPIView):
     serializer_class = UserUpdateSerializer
     permission_classes = [permissions.IsAuthenticated]
     lookup_field = "id" 
+
+
+from usuarios.models import Parqueadero  
+from usuarios.models import Reserva  
+
+from .serializers import UserDeleteSerializer
+
+class UserDeleteView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, id):
+        usuario = get_object_or_404(Usuario, id=id)
+
+        
+        if usuario.id != request.user.id:
+            return Response({"error": "You can only delete your own account."}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = UserDeleteSerializer(usuario)  
+
+    
+        if usuario.tipo_usuario == "Admin":
+            Parqueadero.objects.filter(propietario=usuario).delete()
+
+        
+        if usuario.tipo_usuario == "Cliente":
+            Reserva.objects.filter(cliente=usuario).delete()
+
+        usuario.delete()  
+
+        return Response({
+            "message": "Your account has been successfully deleted.",
+            "deleted_user": serializer.data  
+        }, status=status.HTTP_200_OK)

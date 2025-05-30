@@ -203,3 +203,8 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Usuario
         fields = ['nombre', 'apellido', 'email', 'telefono']
+
+class UserDeleteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Usuario
+        fields = ['id', 'nombre', 'apellido', 'email', 'tipo_usuario']  # ✅ Display user details before deletion
