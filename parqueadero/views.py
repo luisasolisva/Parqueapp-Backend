@@ -277,7 +277,6 @@ class ListaEspaciosDisponiblesView(APIView):
 
 
 
-
 class GuardarEspaciosDisponiblesView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -285,32 +284,54 @@ class GuardarEspaciosDisponiblesView(APIView):
         parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
 
         if request.user.tipo_usuario != "Admin":
-            return Response({"error": "Solo administradores pueden modificar los espacios"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "Solo administradores pueden modificar los espacios."}, status=status.HTTP_403_FORBIDDEN)
 
         nuevos_espacios = request.data.get("espacios_disponibles", [])
 
         if not nuevos_espacios:
-            return Response({"error": "Debes proporcionar al menos un espacio"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Debes proporcionar al menos un espacio."}, status=status.HTTP_400_BAD_REQUEST)
+
+        estados_permitidos = ["Disponible", "Ocupado", "Fuera de servicio"]  # ✅ Definir estados válidos
+        espacios_creados = []
 
         for espacio in nuevos_espacios:
             print("Espacio recibido:", espacio)  # 👀 Verifica qué datos llegan a la API
 
+            # ✅ Validar que los campos requeridos estén presentes
             if not all(key in espacio for key in ["fila", "columna", "espacio", "estado"]):
-                return Response({"error": "Cada espacio debe incluir fila, columna, espacio y estado"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "Cada espacio debe incluir fila, columna, número de espacio y estado."}, status=status.HTTP_400_BAD_REQUEST)
 
-            EspacioParqueadero.objects.create(
+            # ✅ Validar que el estado sea válido
+            if espacio["estado"] not in estados_permitidos:
+                return Response({"error": f"Estado '{espacio['estado']}' no es válido. Solo se permiten: {', '.join(estados_permitidos)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # ✅ Validar que fila y columna sean números
+            try:
+                fila = int(espacio["fila"])
+                columna = int(espacio["columna"])
+            except ValueError:
+                return Response({"error": "Los valores de fila y columna deben ser números."}, status=status.HTTP_400_BAD_REQUEST)
+
+            espacio_obj = EspacioParqueadero.objects.create(
                 id_parqueadero=parqueadero,
                 numero_espacio=espacio["espacio"],
-                fila=espacio["fila"],
-                columna=espacio["columna"],
+                fila=fila,
+                columna=columna,
                 estado=espacio["estado"]
             )
+            espacios_creados.append({
+                "numero_espacio": espacio_obj.numero_espacio,
+                "fila": espacio_obj.fila,
+                "columna": espacio_obj.columna,
+                "estado": espacio_obj.estado
+            })
 
         return Response({
             "message": "Espacios guardados correctamente.",
             "id_parqueadero": str(parqueadero.id_parqueadero),
-            "espacios_disponibles": nuevos_espacios
+            "espacios_creados": espacios_creados
         }, status=status.HTTP_200_OK)
+
 
 
 

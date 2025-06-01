@@ -117,6 +117,11 @@ class Reserva(models.Model):
         ('Cancelada', 'Cancelada'),
         ('Finalizada', 'Finalizada'),
     ]
+    TIPO_VEHICULO_CHOICES = [
+        ('Carro', 'Carro'),
+        ('Moto', 'Moto'),
+        ('Bicicleta', 'Bicicleta'),
+    ]
 
     id_reserva = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     id_usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
@@ -128,6 +133,10 @@ class Reserva(models.Model):
     hora_fin = models.TimeField()
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
     monto_total = models.DecimalField(max_digits=10, decimal_places=2)
+    placa = models.CharField(max_length=10)
+    color = models.CharField(max_length=20)
+    modelo = models.CharField(max_length=50)
+    tipo_vehiculo = models.CharField(max_length=20, choices=TIPO_VEHICULO_CHOICES)
 
     def __str__(self):
         return f'Reserva {self.id_reserva} de {self.id_usuario}'
