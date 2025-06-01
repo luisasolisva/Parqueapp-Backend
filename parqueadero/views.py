@@ -140,46 +140,47 @@ from rest_framework.response import Response
 from rest_framework import status
 from .permissions import IsAdminUser
 from usuarios.models import Parqueadero
-
 class ModificarEspaciosParqueaderoView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     def put(self, request, id_parqueadero):
         parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
 
-        # Validar permisos
+        # ✅ Validar permisos: solo administradores pueden modificar los espacios
         if request.user.tipo_usuario != "Admin":
-            return Response({"error": "Solo administradores pueden modificar los espacios"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "Solo administradores pueden modificar los espacios."}, status=status.HTTP_403_FORBIDDEN)
 
         espacios_modificados = request.data.get("espacios_disponibles", [])
 
         if not espacios_modificados:
-            return Response({"error": "Debes proporcionar al menos un espacio a modificar"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Debes proporcionar al menos un espacio a modificar."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Obtener los espacios actuales en la base de datos
+        estados_permitidos = ["Disponible", "Ocupado", "Fuera de servicio"]  # ✅ Definir estados válidos
         espacios_actuales = EspacioParqueadero.objects.filter(id_parqueadero=parqueadero)
 
-        # Validar que el espacio realmente existe antes de modificarlo
+        # ✅ Validar cada espacio antes de modificarlo
         for modificado in espacios_modificados:
-            espacio_db = espacios_actuales.filter(numero_espacio=modificado["espacio"]).first()
+            espacio_db = espacios_actuales.filter(numero_espacio=modificado.get("espacio")).first()
 
             if not espacio_db:
-                return Response({"error": f"El espacio '{modificado['espacio']}' no existe en el parqueadero."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": f"El espacio '{modificado.get('espacio')}' no existe en el parqueadero."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Modificar estado del espacio
-            espacio_db.estado = modificado["estado"]
+            # ✅ Validar que el estado sea válido
+            if "estado" in modificado and modificado["estado"] not in estados_permitidos:
+                return Response({"error": f"Estado '{modificado['estado']}' no es válido. Solo se permiten: {', '.join(estados_permitidos)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # ✅ Solo modificar el estado y número de espacio
+            if "estado" in modificado:
+                espacio_db.estado = modificado["estado"]
+            if "nuevo_numero_espacio" in modificado:
+                espacio_db.numero_espacio = modificado["nuevo_numero_espacio"]
+
             espacio_db.save()
 
         return Response({
             "message": "Espacios modificados correctamente.",
-            "espacios_disponibles": list(espacios_actuales.values("numero_espacio", "estado"))
+            "espacios_modificados": list(espacios_actuales.values("numero_espacio", "estado"))
         }, status=status.HTTP_200_OK)
-
-
-
-
-
-
 
 class VerEspaciosParqueaderoView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]  # Solo admins pueden acceder
