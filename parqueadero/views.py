@@ -140,46 +140,47 @@ from rest_framework.response import Response
 from rest_framework import status
 from .permissions import IsAdminUser
 from usuarios.models import Parqueadero
-
 class ModificarEspaciosParqueaderoView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     def put(self, request, id_parqueadero):
         parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
 
-        # Validar permisos
+        # ✅ Validar permisos: solo administradores pueden modificar los espacios
         if request.user.tipo_usuario != "Admin":
-            return Response({"error": "Solo administradores pueden modificar los espacios"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "Solo administradores pueden modificar los espacios."}, status=status.HTTP_403_FORBIDDEN)
 
         espacios_modificados = request.data.get("espacios_disponibles", [])
 
         if not espacios_modificados:
-            return Response({"error": "Debes proporcionar al menos un espacio a modificar"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Debes proporcionar al menos un espacio a modificar."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Obtener los espacios actuales en la base de datos
+        estados_permitidos = ["Disponible", "Ocupado", "Fuera de servicio"]  # ✅ Definir estados válidos
         espacios_actuales = EspacioParqueadero.objects.filter(id_parqueadero=parqueadero)
 
-        # Validar que el espacio realmente existe antes de modificarlo
+        # ✅ Validar cada espacio antes de modificarlo
         for modificado in espacios_modificados:
-            espacio_db = espacios_actuales.filter(numero_espacio=modificado["espacio"]).first()
+            espacio_db = espacios_actuales.filter(numero_espacio=modificado.get("espacio")).first()
 
             if not espacio_db:
-                return Response({"error": f"El espacio '{modificado['espacio']}' no existe en el parqueadero."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": f"El espacio '{modificado.get('espacio')}' no existe en el parqueadero."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Modificar estado del espacio
-            espacio_db.estado = modificado["estado"]
+            # ✅ Validar que el estado sea válido
+            if "estado" in modificado and modificado["estado"] not in estados_permitidos:
+                return Response({"error": f"Estado '{modificado['estado']}' no es válido. Solo se permiten: {', '.join(estados_permitidos)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # ✅ Solo modificar el estado y número de espacio
+            if "estado" in modificado:
+                espacio_db.estado = modificado["estado"]
+            if "nuevo_numero_espacio" in modificado:
+                espacio_db.numero_espacio = modificado["nuevo_numero_espacio"]
+
             espacio_db.save()
 
         return Response({
             "message": "Espacios modificados correctamente.",
-            "espacios_disponibles": list(espacios_actuales.values("numero_espacio", "estado"))
+            "espacios_modificados": list(espacios_actuales.values("numero_espacio", "estado"))
         }, status=status.HTTP_200_OK)
-
-
-
-
-
-
 
 class VerEspaciosParqueaderoView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]  # Solo admins pueden acceder
@@ -277,7 +278,6 @@ class ListaEspaciosDisponiblesView(APIView):
 
 
 
-
 class GuardarEspaciosDisponiblesView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -285,32 +285,54 @@ class GuardarEspaciosDisponiblesView(APIView):
         parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
 
         if request.user.tipo_usuario != "Admin":
-            return Response({"error": "Solo administradores pueden modificar los espacios"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "Solo administradores pueden modificar los espacios."}, status=status.HTTP_403_FORBIDDEN)
 
         nuevos_espacios = request.data.get("espacios_disponibles", [])
 
         if not nuevos_espacios:
-            return Response({"error": "Debes proporcionar al menos un espacio"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Debes proporcionar al menos un espacio."}, status=status.HTTP_400_BAD_REQUEST)
+
+        estados_permitidos = ["Disponible", "Ocupado", "Fuera de servicio"]  # ✅ Definir estados válidos
+        espacios_creados = []
 
         for espacio in nuevos_espacios:
             print("Espacio recibido:", espacio)  # 👀 Verifica qué datos llegan a la API
 
+            # ✅ Validar que los campos requeridos estén presentes
             if not all(key in espacio for key in ["fila", "columna", "espacio", "estado"]):
-                return Response({"error": "Cada espacio debe incluir fila, columna, espacio y estado"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "Cada espacio debe incluir fila, columna, número de espacio y estado."}, status=status.HTTP_400_BAD_REQUEST)
 
-            EspacioParqueadero.objects.create(
+            # ✅ Validar que el estado sea válido
+            if espacio["estado"] not in estados_permitidos:
+                return Response({"error": f"Estado '{espacio['estado']}' no es válido. Solo se permiten: {', '.join(estados_permitidos)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # ✅ Validar que fila y columna sean números
+            try:
+                fila = int(espacio["fila"])
+                columna = int(espacio["columna"])
+            except ValueError:
+                return Response({"error": "Los valores de fila y columna deben ser números."}, status=status.HTTP_400_BAD_REQUEST)
+
+            espacio_obj = EspacioParqueadero.objects.create(
                 id_parqueadero=parqueadero,
                 numero_espacio=espacio["espacio"],
-                fila=espacio["fila"],
-                columna=espacio["columna"],
+                fila=fila,
+                columna=columna,
                 estado=espacio["estado"]
             )
+            espacios_creados.append({
+                "numero_espacio": espacio_obj.numero_espacio,
+                "fila": espacio_obj.fila,
+                "columna": espacio_obj.columna,
+                "estado": espacio_obj.estado
+            })
 
         return Response({
             "message": "Espacios guardados correctamente.",
             "id_parqueadero": str(parqueadero.id_parqueadero),
-            "espacios_disponibles": nuevos_espacios
+            "espacios_creados": espacios_creados
         }, status=status.HTTP_200_OK)
+
 
 
 
@@ -371,3 +393,52 @@ class EliminarParqueaderoView(APIView):
         parqueadero.delete()
         return Response({"message": "Parqueadero eliminado correctamente."}, status=status.HTTP_200_OK)
 
+
+from datetime import datetime
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from usuarios.models import Reserva, EspacioParqueadero, Parqueadero
+from .serializers import ReservaSerializer
+class CrearReservaView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, id_parqueadero, id_espacio):
+        # Validamos que el usuario sea Cliente
+        if request.user.tipo_usuario != "Cliente":
+            return Response({"error": "Solo los clientes pueden hacer reservas"}, status=status.HTTP_403_FORBIDDEN)
+
+        parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+        espacio = get_object_or_404(EspacioParqueadero, id_espacio=id_espacio, id_parqueadero=parqueadero)
+
+        # Verificar que el espacio esté disponible
+        if espacio.estado != "Disponible":
+            return Response({"error": "El espacio seleccionado no está disponible"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Capturar datos del vehículo
+        data = request.data.copy()  # Creamos una copia para modificarlo
+        data["id_usuario"] = request.user.id
+        data["id_parqueadero"] = parqueadero.id_parqueadero
+        data["id_espacio"] = espacio.id_espacio
+
+        # Convertir fechas a formato adecuado
+        try:
+            data["fecha_inicio"] = datetime.strptime(data["fecha_inicio"], "%Y-%m-%d").date()
+            data["fecha_fin"] = datetime.strptime(data["fecha_fin"], "%Y-%m-%d").date()
+        except ValueError:
+            return Response({"error": "Formato de fecha incorrecto. Usa YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Serializar y validar los datos
+        serializer = ReservaSerializer(data=data)
+        if serializer.is_valid():
+            reserva = serializer.save(estado="Pendiente")
+
+            # Marcar el espacio como ocupado
+            espacio.estado = "Ocupado"
+            espacio.save()
+
+            return Response({"mensaje": "Reserva creada exitosamente", "id_reserva": str(reserva.id_reserva)}, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
