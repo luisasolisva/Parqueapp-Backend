@@ -393,3 +393,52 @@ class EliminarParqueaderoView(APIView):
         parqueadero.delete()
         return Response({"message": "Parqueadero eliminado correctamente."}, status=status.HTTP_200_OK)
 
+
+from datetime import datetime
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from usuarios.models import Reserva, EspacioParqueadero, Parqueadero
+from .serializers import ReservaSerializer
+class CrearReservaView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, id_parqueadero, id_espacio):
+        # Validamos que el usuario sea Cliente
+        if request.user.tipo_usuario != "Cliente":
+            return Response({"error": "Solo los clientes pueden hacer reservas"}, status=status.HTTP_403_FORBIDDEN)
+
+        parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+        espacio = get_object_or_404(EspacioParqueadero, id_espacio=id_espacio, id_parqueadero=parqueadero)
+
+        # Verificar que el espacio esté disponible
+        if espacio.estado != "Disponible":
+            return Response({"error": "El espacio seleccionado no está disponible"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Capturar datos del vehículo
+        data = request.data.copy()  # Creamos una copia para modificarlo
+        data["id_usuario"] = request.user.id
+        data["id_parqueadero"] = parqueadero.id_parqueadero
+        data["id_espacio"] = espacio.id_espacio
+
+        # Convertir fechas a formato adecuado
+        try:
+            data["fecha_inicio"] = datetime.strptime(data["fecha_inicio"], "%Y-%m-%d").date()
+            data["fecha_fin"] = datetime.strptime(data["fecha_fin"], "%Y-%m-%d").date()
+        except ValueError:
+            return Response({"error": "Formato de fecha incorrecto. Usa YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Serializar y validar los datos
+        serializer = ReservaSerializer(data=data)
+        if serializer.is_valid():
+            reserva = serializer.save(estado="Pendiente")
+
+            # Marcar el espacio como ocupado
+            espacio.estado = "Ocupado"
+            espacio.save()
+
+            return Response({"mensaje": "Reserva creada exitosamente", "id_reserva": str(reserva.id_reserva)}, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

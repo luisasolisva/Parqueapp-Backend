@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import ParqueaderosCercanosView
 from .views import RegistrarParqueaderoView, lista_parqueaderos
-from .views import ModificarParqueaderoView, VerEspaciosParqueaderoView,EliminarParqueaderoView
+from .views import ModificarParqueaderoView, VerEspaciosParqueaderoView,EliminarParqueaderoView,CrearReservaView
 from .views import  ListaEspaciosDisponiblesView, GuardarEspaciosDisponiblesView, ModificarEspaciosParqueaderoView, EstadisticasAdminView, ParqueaderoDetailView
 from . import views
 
@@ -18,4 +18,5 @@ urlpatterns = [
     path('Eliminar_parqueadero/<uuid:id_parqueadero>/', EliminarParqueaderoView.as_view(), name='Eliminar_parqueadero'),
     path('Modificar_espacios/<uuid:id_parqueadero>/', ModificarEspaciosParqueaderoView.as_view(), name="modificar_espacios_parqueadero"),
     path('Ver_espacios/<uuid:id_parqueadero>/', VerEspaciosParqueaderoView.as_view(), name="ver_espacios"),
+    path('reservas/<uuid:id_parqueadero>/<uuid:id_espacio>/', CrearReservaView.as_view(), name='crear_reserva'),
 ]
