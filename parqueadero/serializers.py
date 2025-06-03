@@ -125,8 +125,17 @@ class ReservaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Reserva
         fields = [
-            "id_reserva", "cliente_id", "id_parqueadero", "id_espacio",
-            "fecha_inicio", "fecha_fin", "estado", "placa", "color",
-            "modelo", "tipo_vehiculo", "monto_total"
+            "id_reserva", "cliente", "id_parqueadero", "id_espacio",
+            "fecha_inicio", "hora_inicio", "fecha_fin", "hora_fin",
+            "estado", "placa", "color", "modelo", "tipo_vehiculo",
+            "monto_total"
         ]
         read_only_fields = ["id_reserva", "estado", "monto_total"]
+
+
+
+
+class ReservaDetalleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Reserva
+        fields = "__all__"  # ✅ Incluye todos los datos de la reserva

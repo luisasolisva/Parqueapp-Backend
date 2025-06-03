@@ -394,51 +394,160 @@ class EliminarParqueaderoView(APIView):
         return Response({"message": "Parqueadero eliminado correctamente."}, status=status.HTTP_200_OK)
 
 
-from datetime import datetime
 
+from datetime import datetime
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
 from usuarios.models import Reserva, EspacioParqueadero, Parqueadero
 from .serializers import ReservaSerializer
+
 class CrearReservaView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, id_parqueadero, id_espacio):
-        # Validamos que el usuario sea Cliente
-        if request.user.tipo_usuario != "Cliente":
-            return Response({"error": "Solo los clientes pueden hacer reservas"}, status=status.HTTP_403_FORBIDDEN)
+        # Verificar autenticación del usuario
+        if not request.user.is_authenticated:
+            return Response({"error": "Usuario no autenticado"}, status=status.HTTP_401_UNAUTHORIZED)
 
+        # Verificar que el usuario sea Cliente
+        if request.user.tipo_usuario != "Cliente":
+            return Response({"error": "Solo los clientes pueden crear reservas."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Obtener parqueadero y espacio
         parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
         espacio = get_object_or_404(EspacioParqueadero, id_espacio=id_espacio, id_parqueadero=parqueadero)
 
-        # Verificar que el espacio esté disponible
+        # Verificar disponibilidad del espacio
         if espacio.estado != "Disponible":
-            return Response({"error": "El espacio seleccionado no está disponible"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "El espacio seleccionado no está disponible."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Capturar datos del vehículo
-        data = request.data.copy()  # Creamos una copia para modificarlo
-        data["id_usuario"] = request.user.id
+        # Crear una copia de la solicitud para modificar datos
+        data = request.data.copy()
+        data["cliente"] = request.user.id
         data["id_parqueadero"] = parqueadero.id_parqueadero
-        data["id_espacio"] = espacio.id_espacio
+        data["id_espacio"] = str(espacio.id_espacio) 
 
-        # Convertir fechas a formato adecuado
+        # Verificar y asignar `monto_total` si no está presente
+        data["monto_total"] = data.get("monto_total", 0.0)  # Si no viene, asignamos 0.0
+
+        # Verificar y convertir `hora_inicio`
+        if "hora_inicio" not in data or not data["hora_inicio"]:
+            return Response({"error": "El campo 'hora_inicio' es obligatorio."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            data["hora_inicio"] = datetime.strptime(data["hora_inicio"], "%H:%M:%S").time()
+        except ValueError:
+            return Response({"error": "Formato de hora incorrecto. Usa HH:MM:SS."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Verificar y convertir fechas
         try:
             data["fecha_inicio"] = datetime.strptime(data["fecha_inicio"], "%Y-%m-%d").date()
             data["fecha_fin"] = datetime.strptime(data["fecha_fin"], "%Y-%m-%d").date()
         except ValueError:
             return Response({"error": "Formato de fecha incorrecto. Usa YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Serializar y validar los datos
+        # Validar y guardar la reserva
         serializer = ReservaSerializer(data=data)
         if serializer.is_valid():
-            reserva = serializer.save(estado="Pendiente")
+            reserva = serializer.save(estado="Pendiente", monto_total=0.0)  # Asignar 0.0 en caso de que no venga
 
-            # Marcar el espacio como ocupado
+            # Actualizar estado del espacio
             espacio.estado = "Ocupado"
             espacio.save()
 
             return Response({"mensaje": "Reserva creada exitosamente", "id_reserva": str(reserva.id_reserva)}, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+
+class CancelarReservaView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, id_reserva):
+        # Obtener la reserva
+        reserva = get_object_or_404(Reserva, id_reserva=id_reserva)
+
+        # Verificar que el usuario autenticado es el dueño de la reserva
+        if reserva.cliente != request.user:
+            return Response({"error": "Solo el dueño de la reserva puede cancelarla."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Solo se pueden cancelar reservas pendientes
+        if reserva.estado != "Pendiente":
+            return Response({"error": "Solo puedes cancelar reservas pendientes."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Depuración: imprimir `id_espacio_id` para verificar que llega correctamente
+        print("Espacio ID en reserva:", reserva.id_espacio_id)
+
+        try:
+            # Buscar el espacio con el identificador correcto
+            espacio = get_object_or_404(EspacioParqueadero, id_espacio=reserva.id_espacio_id)
+
+            # Liberar el espacio
+            espacio.estado = "Disponible"
+            espacio.save()
+
+            # Cancelar la reserva
+            reserva.estado = "Cancelada"
+            reserva.save()
+
+            return Response({"mensaje": "Reserva cancelada exitosamente."}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": f"Error al procesar la cancelación: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+
+
+
+
+
+
+class DetalleReservaView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, id_reserva) :   # Obtener la reserva del usuario autenticado
+        reserva = get_object_or_404(Reserva, id_reserva=id_reserva, cliente=request.user)
+
+        # Serializar los datos
+        serializer = ReservaSerializer(reserva)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+
+
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from usuarios.models import Reserva, Parqueadero
+from .serializers import ReservaDetalleSerializer
+
+class ReservasParqueaderoView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, id_parqueadero):
+        # Obtener el parqueadero
+        parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+
+        # Verificar que el usuario es dueño o un operario del parqueadero
+        es_admin = request.user.is_superuser  # Si es admin global
+        es_propietario = parqueadero.propietario == request.user  # Si es el dueño
+        es_operario = request.user.tipo_usuario == "Operario" and request.user.parqueadero_asignado == parqueadero
+
+        if not (es_admin or es_propietario or es_operario):
+            return Response({"error": "No tienes permisos para ver reservas de este parqueadero."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Obtener reservas del parqueadero
+        reservas = Reserva.objects.filter(id_parqueadero=parqueadero)
+        serializer = ReservaDetalleSerializer(reservas, many=True)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
