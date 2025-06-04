@@ -98,7 +98,8 @@ class RegistrarParqueaderoView(GenericAPIView):
         serializer = self.get_serializer(data=request.data, context={'request': request})  # ✅ Pasar el usuario en el contexto
         if serializer.is_valid():
             parqueadero = serializer.save()
-            return Response({"message": "Parqueadero registrado exitosamente.", "parqueadero": serializer.data}, status=status.HTTP_201_CREATED)
+            #return Response({"message": "Parqueadero registrado exitosamente.", "parqueadero": serializer.data}, status=status.HTTP_201_CREATED)
+            return Response({"message": "Parqueadero registrado exitosamente.", "id": parqueadero.id_parqueadero}, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

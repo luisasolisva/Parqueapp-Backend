@@ -79,7 +79,8 @@ class RegistrarParqueaderoSerializer(serializers.ModelSerializer):
         parqueadero_data = RegistrarParqueaderoSerializer(parqueadero).data
         parqueadero_data["imagenes"] = imagen_url  
 
-        return parqueadero_data
+        #return parqueadero_data
+        return parqueadero
 
 class EstadisticasAdminSerializer(serializers.Serializer):
     total_clientes = serializers.IntegerField()
