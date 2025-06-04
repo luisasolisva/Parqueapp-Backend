@@ -16,7 +16,6 @@ urlpatterns = [
     path('detalles-parqueadero/<uuid:id_parqueadero>/', ParqueaderoDetailView.as_view(), name='parqueadero_detalle'),
     path('eliminar-parqueadero/<uuid:id_parqueadero>/', EliminarParqueaderoView.as_view(), name='Eliminar_parqueadero'),
     path('modificar-espacios/<uuid:id_parqueadero>/', ModificarEspaciosParqueaderoView.as_view(), name="modificar_espacios_parqueadero"),
-    path('lista-espaciosdis/<uuid:id_parqueadero>/', ListaEspaciosDisponiblesView.as_view(), name="espacios_disponibles"),
     path('espaciosadmin/<uuid:id_parqueadero>/', VerEspaciosParqueaderoView.as_view(), name="espacios_admin"),
 
 ]
