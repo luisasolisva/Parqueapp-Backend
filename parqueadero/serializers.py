@@ -139,3 +139,4 @@ class ReservaDetalleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Reserva
         fields = "__all__"  # ✅ Incluye todos los datos de la reserva
+
