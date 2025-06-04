@@ -117,20 +117,29 @@ class Reserva(models.Model):
         ('Cancelada', 'Cancelada'),
         ('Finalizada', 'Finalizada'),
     ]
+    TIPO_VEHICULO_CHOICES = [
+        ('Carro', 'Carro'),
+        ('Moto', 'Moto'),
+        ('Bicicleta', 'Bicicleta'),
+    ]
 
     id_reserva = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    id_usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
-    id_parqueadero = models.ForeignKey(Parqueadero, on_delete=models.CASCADE)
-    id_espacio = models.ForeignKey(EspacioParqueadero, on_delete=models.CASCADE)
+    cliente = models.ForeignKey(Usuario, on_delete=models.CASCADE, db_column="cliente_id")
+    id_parqueadero = models.ForeignKey(Parqueadero, on_delete=models.CASCADE, db_column="parqueadero_id")
+    id_espacio = models.ForeignKey(EspacioParqueadero, on_delete=models.CASCADE, db_column="espacio_id")
     fecha_inicio = models.DateField()
     hora_inicio = models.TimeField()
     fecha_fin = models.DateField()
     hora_fin = models.TimeField()
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
-    monto_total = models.DecimalField(max_digits=10, decimal_places=2)
+    monto_total = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)  # ✅ Asegura un valor por defecto
+    placa = models.CharField(max_length=10)
+    color = models.CharField(max_length=20)
+    modelo = models.CharField(max_length=50)
+    tipo_vehiculo = models.CharField(max_length=20, choices=TIPO_VEHICULO_CHOICES)
 
     def __str__(self):
-        return f'Reserva {self.id_reserva} de {self.id_usuario}'
+        return f'Reserva {self.id_reserva} de {self.cliente}'
 
 
 class Pago(models.Model):
