@@ -125,21 +125,16 @@ def lista_parqueaderos(request):
 
     return JsonResponse({'parqueaderos': data})
 
-
-
-
-
-
-
-
-
-
+from datetime import datetime
+from django.core.mail import send_mail
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from django.shortcuts import get_object_or_404
 from .permissions import IsAdminUser
-from usuarios.models import Parqueadero
+from usuarios.models import Parqueadero, EspacioParqueadero, Reserva
+
 class ModificarEspaciosParqueaderoView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
@@ -155,21 +150,43 @@ class ModificarEspaciosParqueaderoView(APIView):
         if not espacios_modificados:
             return Response({"error": "Debes proporcionar al menos un espacio a modificar."}, status=status.HTTP_400_BAD_REQUEST)
 
-        estados_permitidos = ["Disponible", "Ocupado", "Fuera de servicio"]  # ✅ Definir estados válidos
+        estados_permitidos = ["Disponible", "Ocupado", "Fuera de servicio"]
         espacios_actuales = EspacioParqueadero.objects.filter(id_parqueadero=parqueadero)
 
-        # ✅ Validar cada espacio antes de modificarlo
+        reservas_canceladas = []
+
         for modificado in espacios_modificados:
             espacio_db = espacios_actuales.filter(numero_espacio=modificado.get("espacio")).first()
 
             if not espacio_db:
                 return Response({"error": f"El espacio '{modificado.get('espacio')}' no existe en el parqueadero."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # ✅ Validar que el estado sea válido
             if "estado" in modificado and modificado["estado"] not in estados_permitidos:
                 return Response({"error": f"Estado '{modificado['estado']}' no es válido. Solo se permiten: {', '.join(estados_permitidos)}"}, status=status.HTTP_400_BAD_REQUEST)
 
-            # ✅ Solo modificar el estado y número de espacio
+            # ✅ Verificar si el espacio tenía una reserva activa
+            reserva_activa = Reserva.objects.filter(id_espacio=espacio_db, estado="Pendiente").first()
+            if reserva_activa:
+                # ✅ Cambiar el estado de la reserva a Cancelada
+                reserva_activa.estado = "Cancelada"
+                reserva_activa.save()
+
+                # ✅ Notificar al cliente
+                send_mail(
+                    "Cancelación de reserva - Modificación de espacio",
+                    f"Estimado usuario,\n\nTu reserva en el espacio {espacio_db.numero_espacio} ha sido cancelada porque el espacio ha sido modificado por el administrador.\n\nDisculpa las molestias.",
+                    "parqueappreservas@gmail.com",
+                    [reserva_activa.cliente.email],
+                    fail_silently=False,
+                )
+
+                reservas_canceladas.append({
+                    "id_reserva": str(reserva_activa.id_reserva),
+                    "cliente": reserva_activa.cliente.email,
+                    "numero_espacio": espacio_db.numero_espacio
+                })
+
+            # ✅ Modificar el estado del espacio
             if "estado" in modificado:
                 espacio_db.estado = modificado["estado"]
             if "nuevo_numero_espacio" in modificado:
@@ -179,8 +196,14 @@ class ModificarEspaciosParqueaderoView(APIView):
 
         return Response({
             "message": "Espacios modificados correctamente.",
+            "reservas_canceladas": reservas_canceladas,
             "espacios_modificados": list(espacios_actuales.values("numero_espacio", "estado"))
         }, status=status.HTTP_200_OK)
+
+
+
+
+
 
 class VerEspaciosParqueaderoView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]  # Solo admins pueden acceder
@@ -396,6 +419,11 @@ class EliminarParqueaderoView(APIView):
 
 
 from datetime import datetime
+import qrcode
+from io import BytesIO
+from django.template.loader import render_to_string
+from django.core.mail import EmailMessage
+from email.mime.image import MIMEImage
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -403,61 +431,101 @@ from django.shortcuts import get_object_or_404
 from usuarios.models import Reserva, EspacioParqueadero, Parqueadero
 from .serializers import ReservaSerializer
 
+def generar_qr(texto):
+    """Genera un código QR en formato de imagen."""
+    qr = qrcode.make(texto)
+    buffer = BytesIO()
+    qr.save(buffer, format="PNG")
+    return buffer.getvalue()
+
 class CrearReservaView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, id_parqueadero, id_espacio):
-        # Verificar autenticación del usuario
         if not request.user.is_authenticated:
             return Response({"error": "Usuario no autenticado"}, status=status.HTTP_401_UNAUTHORIZED)
 
-        # Verificar que el usuario sea Cliente
         if request.user.tipo_usuario != "Cliente":
             return Response({"error": "Solo los clientes pueden crear reservas."}, status=status.HTTP_403_FORBIDDEN)
 
-        # Obtener parqueadero y espacio
         parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
         espacio = get_object_or_404(EspacioParqueadero, id_espacio=id_espacio, id_parqueadero=parqueadero)
 
-        # Verificar disponibilidad del espacio
         if espacio.estado != "Disponible":
             return Response({"error": "El espacio seleccionado no está disponible."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Crear una copia de la solicitud para modificar datos
+        # Verificar disponibilidad en fecha y hora
+        fecha_inicio = request.data.get("fecha_inicio")
+        hora_inicio = request.data.get("hora_inicio")
+        reservas_existentes = Reserva.objects.filter(id_espacio=espacio, fecha_inicio=fecha_inicio, hora_inicio=hora_inicio)
+
+        if reservas_existentes.exists():
+            return Response({"error": "Este espacio ya está reservado para la fecha y hora seleccionadas."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Calcular el monto si no está presente
+        horas_reservadas = (datetime.strptime(request.data["hora_fin"], "%H:%M:%S") - datetime.strptime(request.data["hora_inicio"], "%H:%M:%S")).seconds / 3600
+        monto_total = round(horas_reservadas * float(parqueadero.precio_hora), 2)
+
+        # Paso 1: Mostrar los detalles antes de la confirmación
+        if not request.data.get("confirmar"):
+            return Response({
+                "mensaje": "Detalles de la reserva antes de confirmar.",
+                "id_parqueadero": str(parqueadero.id_parqueadero),
+                "nombre_parqueadero": parqueadero.nombre,
+                "id_espacio": str(espacio.id_espacio),
+                "fecha_inicio": fecha_inicio,
+                "hora_inicio": hora_inicio,
+                "fecha_fin": request.data["fecha_fin"],
+                "hora_fin": request.data["hora_fin"],
+                "monto_total": monto_total,
+                "confirmar": False
+            }, status=status.HTTP_200_OK)
+
+        # Paso 2: Si el usuario confirma, se crea la reserva
         data = request.data.copy()
         data["cliente"] = request.user.id
-        data["id_parqueadero"] = parqueadero.id_parqueadero
-        data["id_espacio"] = str(espacio.id_espacio) 
+        data["monto_total"] = monto_total
 
-        # Verificar y asignar `monto_total` si no está presente
-        data["monto_total"] = data.get("monto_total", 0.0)  # Si no viene, asignamos 0.0
-
-        # Verificar y convertir `hora_inicio`
-        if "hora_inicio" not in data or not data["hora_inicio"]:
-            return Response({"error": "El campo 'hora_inicio' es obligatorio."}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            data["hora_inicio"] = datetime.strptime(data["hora_inicio"], "%H:%M:%S").time()
-        except ValueError:
-            return Response({"error": "Formato de hora incorrecto. Usa HH:MM:SS."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Verificar y convertir fechas
-        try:
-            data["fecha_inicio"] = datetime.strptime(data["fecha_inicio"], "%Y-%m-%d").date()
-            data["fecha_fin"] = datetime.strptime(data["fecha_fin"], "%Y-%m-%d").date()
-        except ValueError:
-            return Response({"error": "Formato de fecha incorrecto. Usa YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Validar y guardar la reserva
         serializer = ReservaSerializer(data=data)
         if serializer.is_valid():
-            reserva = serializer.save(estado="Pendiente", monto_total=0.0)  # Asignar 0.0 en caso de que no venga
+            reserva = serializer.save(estado="Pendiente", monto_total=monto_total)
 
-            # Actualizar estado del espacio
-            espacio.estado = "Ocupado"
+            # Generar código QR como imagen
+            qr_image = generar_qr(f"Reserva {reserva.id_reserva}")
+
+            # Marcar el espacio como reservado
+            espacio.estado = "Reservado"
             espacio.save()
 
-            return Response({"mensaje": "Reserva creada exitosamente", "id_reserva": str(reserva.id_reserva)}, status=status.HTTP_201_CREATED)
+            # Renderizar el correo HTML con los detalles
+            email_html = render_to_string("correo_confirmacion.html", {
+                "id_reserva": reserva.id_reserva,
+                "monto_total": reserva.monto_total,
+                "fecha_inicio": reserva.fecha_inicio,
+                "hora_inicio": reserva.hora_inicio,
+                "nombre_parqueadero": parqueadero.nombre,
+            })
+
+            # Crear correo con HTML
+            email = EmailMessage(
+                "Confirmación de reserva",
+                email_html,
+                "parqueappreservas@gmail.com",
+                [request.user.email],
+            )
+            email.content_subtype = "html"
+
+            # Adjuntar la imagen QR
+            image_attachment = MIMEImage(qr_image)
+            image_attachment.add_header("Content-ID", "<qr_reserva>")
+            email.attach(image_attachment)
+
+            email.send()
+
+            return Response({
+                "mensaje": "Reserva creada exitosamente",
+                "id_reserva": str(reserva.id_reserva)
+            }, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -465,40 +533,53 @@ class CrearReservaView(APIView):
 
 
 
+
+
+
+
+
+
+
+from datetime import datetime
+from django.core.mail import send_mail
+
 class CancelarReservaView(APIView):
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, id_reserva):
-        # Obtener la reserva
         reserva = get_object_or_404(Reserva, id_reserva=id_reserva)
 
-        # Verificar que el usuario autenticado es el dueño de la reserva
         if reserva.cliente != request.user:
             return Response({"error": "Solo el dueño de la reserva puede cancelarla."}, status=status.HTTP_403_FORBIDDEN)
 
-        # Solo se pueden cancelar reservas pendientes
-        if reserva.estado != "Pendiente":
-            return Response({"error": "Solo puedes cancelar reservas pendientes."}, status=status.HTTP_400_BAD_REQUEST)
+        # Obtener fecha y hora actual
+        ahora = datetime.now()
 
-        # Depuración: imprimir `id_espacio_id` para verificar que llega correctamente
-        print("Espacio ID en reserva:", reserva.id_espacio_id)
+        # Combinar fecha y hora de la reserva
+        hora_inicio_reserva = datetime.combine(reserva.fecha_inicio, reserva.hora_inicio)
 
-        try:
-            # Buscar el espacio con el identificador correcto
-            espacio = get_object_or_404(EspacioParqueadero, id_espacio=reserva.id_espacio_id)
+        # Comparar fecha y hora completas
+        if ahora >= hora_inicio_reserva:
+            return Response({"error": "No puedes cancelar una reserva después de la hora de inicio."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Liberar el espacio
-            espacio.estado = "Disponible"
-            espacio.save()
+        # Lógica de cancelación
+        reserva.id_espacio.estado = "Disponible"
+        reserva.id_espacio.save()
+        reserva.estado = "Cancelada"
+        reserva.save()
 
-            # Cancelar la reserva
-            reserva.estado = "Cancelada"
-            reserva.save()
+        # Enviar correo de cancelación
+        send_mail(
+            "Cancelación de reserva",
+            f"Tu reserva ha sido cancelada.\nID: {reserva.id_reserva}",
+            "parqueappreservas@gmail.com",
+            [request.user.email],
+            fail_silently=False,
+        )
 
-            return Response({"mensaje": "Reserva cancelada exitosamente."}, status=status.HTTP_200_OK)
+        return Response({"mensaje": "Reserva cancelada exitosamente."}, status=status.HTTP_200_OK)
 
-        except Exception as e:
-            return Response({"error": f"Error al procesar la cancelación: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 

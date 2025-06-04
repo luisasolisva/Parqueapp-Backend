@@ -132,7 +132,7 @@ class Reserva(models.Model):
     fecha_fin = models.DateField()
     hora_fin = models.TimeField()
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
-    monto_total = models.DecimalField(max_digits=10, decimal_places=2)
+    monto_total = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)  # ✅ Asegura un valor por defecto
     placa = models.CharField(max_length=10)
     color = models.CharField(max_length=20)
     modelo = models.CharField(max_length=50)
