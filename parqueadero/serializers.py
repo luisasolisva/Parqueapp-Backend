@@ -31,50 +31,47 @@ import cloudinary.uploader
 from rest_framework import serializers
 from usuarios.models import Parqueadero
 from parqueadero.utils import validar_imagen
+from django.db import IntegrityError
 
 class RegistrarParqueaderoSerializer(serializers.ModelSerializer):
-    imagenes = serializers.ImageField(required=False)  # ✅ Permitir una imagen opcional
+    imagenes = serializers.ImageField(required=True)  # ✅ Ahora la imagen es obligatoria
 
     class Meta:
         model = Parqueadero
         fields = ['nombre', 'direccion', 'ciudad', 'latitud', 'longitud', 'precio_hora', 'nombre_propietario', 'descripcion', 'imagenes']
 
-    def validate_imagenes(self, imagen):
-        error = validar_imagen(imagen)  # ✅ Validación ANTES de procesar la creación
-        if error:
-            raise serializers.ValidationError(error)
-        return imagen
-
-    def create(self, validated_data):
-        request = self.context.get('request')  # ✅ Obtener el usuario autenticado
+    def validate(self, data):
+        """Validar que todos los campos obligatorios estén presentes y que el admin no registre más de un parqueadero."""
+        request = self.context.get('request')  
         if not request or not request.user.is_authenticated:
             raise serializers.ValidationError("Debes estar autenticado para registrar un parqueadero.")
 
+        if Parqueadero.objects.filter(propietario=request.user).exists():
+            raise serializers.ValidationError("El administrador ya tiene un parqueadero registrado y no puede crear otro.")
+
+        # ✅ Validar que ningún campo obligatorio esté vacío
+        for campo in ['nombre', 'direccion', 'ciudad', 'latitud', 'longitud', 'precio_hora', 'nombre_propietario', 'descripcion', 'imagenes']:
+            if not data.get(campo):
+                raise serializers.ValidationError({campo: f"El campo {campo} es obligatorio."})
+
+        return data
+
+    def create(self, validated_data):
+        request = self.context.get('request')  
         imagen = validated_data.pop("imagenes", None)
 
-        # ✅ Validar imagen antes de crear el parqueadero
-        if imagen:
-            error = validar_imagen(imagen)
-            if error:
-                raise serializers.ValidationError(error)  # ✅ Evita que el parqueadero se cree si la imagen falla
+        try:
+            parqueadero = Parqueadero.objects.create(propietario=request.user, **validated_data)
 
-        # ✅ Crear el parqueadero asociándolo al Admin que lo registra
-        parqueadero = Parqueadero.objects.create(propietario=request.user, **validated_data)
-
-        # ✅ Subir imagen solo si pasó la validación
-        imagen_url = None
-        if imagen:
+            # ✅ Subir imagen solo si se proporciona
             resultado = cloudinary.uploader.upload(imagen)
             ImagenParqueadero.objects.create(parqueadero=parqueadero, imagen=resultado["url"])
-            imagen_url = resultado["url"]
 
-        # ✅ Retornar todos los datos junto con la imagen
-        parqueadero_data = RegistrarParqueaderoSerializer(parqueadero).data
-        parqueadero_data["imagenes"] = imagen_url  
+            return parqueadero
 
-        #return parqueadero_data
-        return parqueadero
-
+        except Exception as e:
+            raise serializers.ValidationError(f"Error en la base de datos: {str(e)}")
+        
 class EstadisticasAdminSerializer(serializers.Serializer):
     total_clientes = serializers.IntegerField()
     total_reservas = serializers.IntegerField()

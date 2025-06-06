@@ -89,20 +89,20 @@ from rest_framework.permissions import IsAuthenticated
 from .permissions import IsAdminUser
 from rest_framework.parsers import MultiPartParser, FormParser
 from parqueadero.utils import validar_imagen  
-
-class RegistrarParqueaderoView(GenericAPIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
-    serializer_class = RegistrarParqueaderoSerializer
+    
+class RegistrarParqueaderoView(APIView):
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        serializer = self.get_serializer(data=request.data, context={'request': request})  # ✅ Pasar el usuario en el contexto
+        serializer = RegistrarParqueaderoSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
-            parqueadero = serializer.save()
-            #return Response({"message": "Parqueadero registrado exitosamente.", "parqueadero": serializer.data}, status=status.HTTP_201_CREATED)
-            return Response({"message": "Parqueadero registrado exitosamente.", "id": parqueadero.id_parqueadero}, status=status.HTTP_201_CREATED)
+            try:
+                parqueadero = serializer.save()
+                return Response({"message": "Parqueadero registrado exitosamente.", "id": parqueadero.id_parqueadero}, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 
 
@@ -234,41 +234,42 @@ class VerEspaciosParqueaderoView(APIView):
 
         return Response({"espacios_parqueadero": espacios_disponibles}, status=status.HTTP_200_OK)
 
+from rest_framework import serializers
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from usuarios.models import Parqueadero, EspacioParqueadero, ImagenParqueadero
+import cloudinary.uploader
+from django.db import IntegrityError
 
-
-
-class ModificarParqueaderoView(GenericAPIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
-    serializer_class = ParqueaderoSerializer
-    queryset = Parqueadero.objects.all()
-
-    def get_object(self):
-        return get_object_or_404(Parqueadero, id_parqueadero=self.kwargs['id_parqueadero'])
-
-    def get(self, request, id_parqueadero):
-        parqueadero = self.get_object()
-        serializer = self.get_serializer(parqueadero, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+class ModificarParqueaderoView(APIView):
+    permission_classes = [IsAuthenticated]
 
     def put(self, request, id_parqueadero):
-        parqueadero = self.get_object()
-        serializer = self.get_serializer(parqueadero, data=request.data, context={'request': request}, partial=True)
+        parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+
+        serializer = RegistrarParqueaderoSerializer(parqueadero, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             parqueadero = serializer.save()
-            parqueadero_data = ParqueaderoSerializer(parqueadero, context={'request': request}).data
+
+            # ✅ Permitir modificar imagen si se envía en la solicitud
+            imagen = request.data.get("imagenes")
+            if imagen:
+                ImagenParqueadero.objects.filter(parqueadero=parqueadero).delete()  # ✅ Eliminar imagen anterior
+                resultado = cloudinary.uploader.upload(imagen)
+                ImagenParqueadero.objects.create(parqueadero=parqueadero, imagen=resultado["url"])
+
             return Response({
                 "message": "Parqueadero modificado exitosamente.",
-                "parqueadero": parqueadero_data
+                "parqueadero": RegistrarParqueaderoSerializer(parqueadero).data
             }, status=status.HTTP_200_OK)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     
-    
-    
-    
-    
 
-class GuardarEspaciosDisponiblesView(APIView):
+class GuardarEspaciosView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, id_parqueadero):
@@ -277,26 +278,23 @@ class GuardarEspaciosDisponiblesView(APIView):
         if request.user.tipo_usuario != "Admin":
             return Response({"error": "Solo administradores pueden modificar los espacios."}, status=status.HTTP_403_FORBIDDEN)
 
-        nuevos_espacios = request.data.get("espacios_disponibles", [])
+        datos_mapa = request.data.get("mapaParqueadero")
+        if not datos_mapa or "espacios" not in datos_mapa:
+            return Response({"error": "Debes proporcionar la estructura completa del mapa."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not nuevos_espacios:
-            return Response({"error": "Debes proporcionar al menos un espacio."}, status=status.HTTP_400_BAD_REQUEST)
+        espacios = datos_mapa["espacios"]
+        nomenclatura = datos_mapa.get("nomenclatura", "numérica")
+        estados_permitidos = ["Disponible", "Ocupado", "Deshabilitado"]
 
-        estados_permitidos = ["Disponible", "Ocupado", "Fuera de servicio"]  # ✅ Definir estados válidos
         espacios_creados = []
 
-        for espacio in nuevos_espacios:
-            print("Espacio recibido:", espacio)  # 👀 Verifica qué datos llegan a la API
-
-            # ✅ Validar que los campos requeridos estén presentes
+        for espacio in espacios:
             if not all(key in espacio for key in ["fila", "columna", "espacio", "estado"]):
                 return Response({"error": "Cada espacio debe incluir fila, columna, número de espacio y estado."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # ✅ Validar que el estado sea válido
             if espacio["estado"] not in estados_permitidos:
                 return Response({"error": f"Estado '{espacio['estado']}' no es válido. Solo se permiten: {', '.join(estados_permitidos)}"}, status=status.HTTP_400_BAD_REQUEST)
 
-            # ✅ Validar que fila y columna sean números
             try:
                 fila = int(espacio["fila"])
                 columna = int(espacio["columna"])
@@ -318,12 +316,12 @@ class GuardarEspaciosDisponiblesView(APIView):
             })
 
         return Response({
-            "message": "Espacios guardados correctamente.",
+            "message": "Mapa y espacios guardados correctamente.",
             "id_parqueadero": str(parqueadero.id_parqueadero),
+            "mapaSize": datos_mapa["mapaSize"],
+            "nomenclatura": nomenclatura,
             "espacios_creados": espacios_creados
         }, status=status.HTTP_200_OK)
-
-
 
 
 from rest_framework.views import APIView
