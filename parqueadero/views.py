@@ -363,8 +363,8 @@ from .serializers import ParqueaderoDetailSerializer
 class ParqueaderoDetailView(APIView):
     permission_classes = [IsAuthenticated]  # ✅ Solo usuarios autenticados pueden ver detalles
 
-    def get(self, request, id_parqueadero):
-        parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+    def get(self, request, id_admin):
+        parqueadero = get_object_or_404(Parqueadero, propietario__id=id_admin)
         serializer = ParqueaderoDetailSerializer(parqueadero)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
