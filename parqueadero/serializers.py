@@ -108,3 +108,31 @@ class EliminarParqueaderoSerializer(serializers.ModelSerializer):
         model = Parqueadero
         fields = ['id_parqueadero', 'nombre', 'direccion', 'ciudad']  # ✅ Mostrar algunos detalles antes de eliminar
 
+
+class ModificarParqueaderoSerializer(serializers.ModelSerializer):
+    imagenes = serializers.ImageField(required=False, allow_null=True)  # ✅ Imagen opcional en modificación
+
+    class Meta:
+        model = Parqueadero
+        fields = ['nombre', 'direccion', 'ciudad', 'latitud', 'longitud', 'precio_hora', 'nombre_propietario', 'descripcion', 'imagenes']
+
+    def update(self, instance, validated_data):
+        """Actualizar los datos del parqueadero sin restricciones de registro duplicado."""
+        imagen = validated_data.pop("imagenes", None)
+
+        instance.nombre = validated_data.get("nombre", instance.nombre)
+        instance.direccion = validated_data.get("direccion", instance.direccion)
+        instance.ciudad = validated_data.get("ciudad", instance.ciudad)
+        instance.latitud = validated_data.get("latitud", instance.latitud)
+        instance.longitud = validated_data.get("longitud", instance.longitud)
+        instance.precio_hora = validated_data.get("precio_hora", instance.precio_hora)
+        instance.nombre_propietario = validated_data.get("nombre_propietario", instance.nombre_propietario)
+        instance.descripcion = validated_data.get("descripcion", instance.descripcion)
+        instance.save()
+
+        if imagen:
+            ImagenParqueadero.objects.filter(parqueadero=instance).delete()  # ✅ Eliminar imagen anterior
+            resultado = cloudinary.uploader.upload(imagen)
+            ImagenParqueadero.objects.create(parqueadero=instance, imagen=resultado["url"])
+
+        return instance
