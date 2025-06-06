@@ -151,7 +151,7 @@ class ModificarEspaciosParqueaderoView(APIView):
         if not espacios_modificados:
             return Response({"error": "Debes proporcionar al menos un espacio a modificar."}, status=status.HTTP_400_BAD_REQUEST)
 
-        estados_permitidos = ["Disponible", "Ocupado", "Fuera de servicio"]
+        estados_permitidos = ["Disponible", "Ocupado", "Deshabilitado"]
         espacios_actuales = EspacioParqueadero.objects.filter(id_parqueadero=parqueadero)
 
         reservas_canceladas = []
@@ -266,7 +266,7 @@ class ModificarParqueaderoView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class GuardarEspaciosView(APIView):
+class crearmapaView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, id_parqueadero):
