@@ -51,7 +51,6 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 from usuarios.models import Reserva, EspacioParqueadero, Parqueadero
 from .serializers import ReservaSerializer
-
 def generar_qr(texto):
     """Genera un código QR en formato de imagen."""
     qr = qrcode.make(texto)
@@ -109,7 +108,16 @@ class CrearReservaView(APIView):
 
         serializer = ReservaSerializer(data=data)
         if serializer.is_valid():
-            reserva = serializer.save(estado="Pendiente", monto_total=monto_total)
+            reserva = serializer.save(estado="Pendiente", monto_total=data["monto_total"])
+            
+            # ✅ Cambiamos el estado a "Confirmada" si el usuario confirmó la reserva
+            if request.data.get("confirmar"):
+                reserva.estado = "Confirmada"
+                reserva.save(update_fields=["estado"])
+
+            # ✅ Asignamos correctamente el QR en texto
+            reserva.codigo_qr_texto = f"Reserva {reserva.id_reserva}"
+            reserva.save(update_fields=["codigo_qr_texto"])  # ✅ Guardamos solo el código QR en la BD
 
             # Generar código QR como imagen
             qr_image = generar_qr(f"Reserva {reserva.id_reserva}")
@@ -145,20 +153,11 @@ class CrearReservaView(APIView):
 
             return Response({
                 "mensaje": "Reserva creada exitosamente",
-                "id_reserva": str(reserva.id_reserva)
+                "id_reserva": str(reserva.id_reserva),
+                "estado": reserva.estado  # ✅ Confirmamos el estado de la reserva en la respuesta
             }, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-
-
-
-
-
-
-
-
 
 
 from datetime import datetime
@@ -253,3 +252,47 @@ class ReservasParqueaderoView(APIView):
         serializer = ReservaDetalleSerializer(reservas, many=True)
 
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+
+
+from django.shortcuts import get_object_or_404
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from usuarios.models import Reserva
+from reservas.utils import extraer_codigo_qr  # ✅ Importa la función de lectura QR
+
+class ValidarReservaView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        # ✅ Recibir la imagen del QR
+        imagen_qr = request.FILES.get("qr_imagen")
+
+        if not imagen_qr:
+            return Response({"error": "Imagen del código QR no proporcionada."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # ✅ Convertir imagen en texto
+        codigo_qr_texto = extraer_codigo_qr(imagen_qr)
+
+        if not codigo_qr_texto:
+            return Response({"error": "No se pudo leer el código QR."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # ✅ Buscar la reserva asociada al código QR
+        reserva = get_object_or_404(Reserva, codigo_qr_texto=codigo_qr_texto)
+
+        # ✅ Validar si la reserva está activa
+        if reserva.estado != "Confirmada":
+            return Response({"error": f"La reserva no es válida para el acceso. Estado: {reserva.estado}"}, status=status.HTTP_403_FORBIDDEN)
+
+        # ✅ Permitir el acceso
+        return Response({
+            "mensaje": "Acceso permitido.",
+            "id_reserva": str(reserva.id_reserva),
+            "cliente": reserva.cliente.email,
+            "fecha_inicio": reserva.fecha_inicio,
+            "hora_inicio": reserva.hora_inicio,
+            "estado": reserva.estado
+        }, status=status.HTTP_200_OK)

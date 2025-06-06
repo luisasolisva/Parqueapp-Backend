@@ -137,6 +137,8 @@ class Reserva(models.Model):
     color = models.CharField(max_length=20)
     modelo = models.CharField(max_length=50)
     tipo_vehiculo = models.CharField(max_length=20, choices=TIPO_VEHICULO_CHOICES)
+    codigo_qr_texto = models.TextField(blank=True, null=True)  # ✅ Nuevo campo para almacenar el QR en texto
+
 
     def __str__(self):
         return f'Reserva {self.id_reserva} de {self.cliente}'
