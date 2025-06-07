@@ -352,16 +352,64 @@ class EstadisticasAdminView(APIView):
         serializer = EstadisticasAdminSerializer(data)  # ✅ Se asegura que reciba un diccionario
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+
+# Vista con endpint dinámico que retorna los detalles del parqueadero validando el id_admin o id_parqueadero 
+import uuid
 from .serializers import ParqueaderoDetailSerializer
 
-
 class ParqueaderoDetailView(APIView):
-    permission_classes = [IsAuthenticated]  # ✅ Solo usuarios autenticados pueden ver detalles
+    permission_classes = [IsAuthenticated]
 
-    def get(self, request, id_admin):
-        parqueadero = get_object_or_404(Parqueadero, propietario__id=id_admin)
-        serializer = ParqueaderoDetailSerializer(parqueadero)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+    def get(self, request):
+        # GET /detalles-parqueadero/?id_admin=<uuid>
+        id_admin = request.query_params.get('id_admin')
+        # GET /detalles-parqueadero/?id_parqueadero=<uuid>
+        id_parqueadero = request.query_params.get('id_parqueadero')
+
+        try:
+            # Consulta por id_admin (solo el mismo admin puede hacerla)
+            if id_admin:
+                if request.user.id != uuid.UUID(id_admin):
+                    return Response({
+                        "message": "No tienes permiso para ver esta información."
+                    }, status=status.HTTP_403_FORBIDDEN)
+
+                parqueadero = Parqueadero.objects.filter(propietario__id=id_admin).first()
+
+                if parqueadero:
+                    serializer = ParqueaderoDetailSerializer(parqueadero)
+                    return Response({
+                        "tiene_parqueadero": True,
+                        "data": serializer.data
+                    }, status=status.HTTP_200_OK)
+                else:
+                    return Response({
+                        "tiene_parqueadero": False,
+                        "message": "No tienes parqueadero registrado."
+                    }, status=status.HTTP_200_OK)
+
+            # Consulta por id_parqueadero (pública, sin has_parqueadero)
+            elif id_parqueadero:
+                parqueadero = Parqueadero.objects.filter(id_parqueadero=id_parqueadero).first()
+
+                if parqueadero:
+                    serializer = ParqueaderoDetailSerializer(parqueadero)
+                    return Response(serializer.data, status=status.HTTP_200_OK)
+                else:
+                    return Response({
+                        "message": "Parqueadero no encontrado."
+                    }, status=status.HTTP_404_NOT_FOUND)
+
+            # Ningún parámetro recibido
+            return Response({
+                "message": "Debes proporcionar un parámetro: id_admin o id_parqueadero."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            return Response({
+                "message": "Error inesperado en el servidor.",
+                "error": str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 
