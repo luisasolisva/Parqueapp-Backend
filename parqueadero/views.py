@@ -151,7 +151,7 @@ class ModificarEspaciosParqueaderoView(APIView):
         if not espacios_modificados:
             return Response({"error": "Debes proporcionar al menos un espacio a modificar."}, status=status.HTTP_400_BAD_REQUEST)
 
-        estados_permitidos = ["Disponible", "Ocupado", "Fuera de servicio"]
+        estados_permitidos = ["Disponible", "Ocupado", "Deshabilitado"]
         espacios_actuales = EspacioParqueadero.objects.filter(id_parqueadero=parqueadero)
 
         reservas_canceladas = []
@@ -241,7 +241,8 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 from usuarios.models import Parqueadero, EspacioParqueadero, ImagenParqueadero
 import cloudinary.uploader
-from django.db import IntegrityError
+from .serializers import ModificarParqueaderoSerializer
+
 
 class ModificarParqueaderoView(APIView):
     permission_classes = [IsAuthenticated]
@@ -249,27 +250,23 @@ class ModificarParqueaderoView(APIView):
     def put(self, request, id_parqueadero):
         parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
 
-        serializer = RegistrarParqueaderoSerializer(parqueadero, data=request.data, partial=True, context={'request': request})
+        serializer = ModificarParqueaderoSerializer(parqueadero, data=request.data, partial=True)
         if serializer.is_valid():
             parqueadero = serializer.save()
+            imagen_existente = ImagenParqueadero.objects.filter(parqueadero=parqueadero).first()
+            imagen_url = str(imagen_existente.imagen) if imagen_existente else None  # ✅ Convertimos la imagen a su URL
 
-            # ✅ Permitir modificar imagen si se envía en la solicitud
-            imagen = request.data.get("imagenes")
-            if imagen:
-                ImagenParqueadero.objects.filter(parqueadero=parqueadero).delete()  # ✅ Eliminar imagen anterior
-                resultado = cloudinary.uploader.upload(imagen)
-                ImagenParqueadero.objects.create(parqueadero=parqueadero, imagen=resultado["url"])
 
             return Response({
                 "message": "Parqueadero modificado exitosamente.",
-                "parqueadero": RegistrarParqueaderoSerializer(parqueadero).data
+                "parqueadero": ModificarParqueaderoSerializer(parqueadero).data,
+                "imagen": imagen_url
             }, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    
 
-class GuardarEspaciosView(APIView):
+
+class crearmapaView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, id_parqueadero):
