@@ -83,7 +83,7 @@ class Parqueadero(models.Model):
     ciudad = models.CharField(max_length=100)
     latitud = models.DecimalField(max_digits=9, decimal_places=6)
     longitud = models.DecimalField(max_digits=9, decimal_places=6)
-    precio_hora = models.DecimalField(max_digits=10, decimal_places=3)
+    precio_hora = models.IntegerField()
     nombre_propietario = models.CharField(max_length=200) 
     propietario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
     descripcion = models.TextField(blank=True, null=True) 
