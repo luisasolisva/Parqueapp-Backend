@@ -280,16 +280,20 @@ class crearmapaView(APIView):
             return Response({"error": "Debes proporcionar la estructura completa del mapa."}, status=status.HTTP_400_BAD_REQUEST)
 
         espacios = datos_mapa["espacios"]
-        nomenclatura = datos_mapa.get("nomenclatura", "numérica")
-        estados_permitidos = ["Disponible", "Ocupado", "Deshabilitado"]
+        mapa_size = datos_mapa.get("mapaSize", {})
+        nomenclatura = datos_mapa.get("nomenclatura", "Numerica")
 
+        if nomenclatura not in dict(EspacioParqueadero.NOMENCLATURA_CHOICES):
+            return Response({"error": "Nomenclatura no válida. Usa 'Numerica' o 'Alfanumerica'."}, status=status.HTTP_400_BAD_REQUEST)
+
+        estados_permitidos = ["Disponible", "Ocupado", "Deshabilitado"]
         espacios_creados = []
 
         for espacio in espacios:
             if not all(key in espacio for key in ["fila", "columna", "espacio", "estado"]):
                 return Response({"error": "Cada espacio debe incluir fila, columna, número de espacio y estado."}, status=status.HTTP_400_BAD_REQUEST)
 
-            if espacio["estado"] not in estados_permitidos:
+            if espacio["estado"].capitalize() not in estados_permitidos:
                 return Response({"error": f"Estado '{espacio['estado']}' no es válido. Solo se permiten: {', '.join(estados_permitidos)}"}, status=status.HTTP_400_BAD_REQUEST)
 
             try:
@@ -303,21 +307,23 @@ class crearmapaView(APIView):
                 numero_espacio=espacio["espacio"],
                 fila=fila,
                 columna=columna,
-                estado=espacio["estado"]
+                estado=espacio["estado"].capitalize(),
+                nomenclatura=nomenclatura
             )
+
             espacios_creados.append({
-                "numero_espacio": espacio_obj.numero_espacio,
                 "fila": espacio_obj.fila,
                 "columna": espacio_obj.columna,
+                "espacio": espacio_obj.numero_espacio,
                 "estado": espacio_obj.estado
             })
 
         return Response({
-            "message": "Mapa y espacios guardados correctamente.",
-            "id_parqueadero": str(parqueadero.id_parqueadero),
-            "mapaSize": datos_mapa["mapaSize"],
-            "nomenclatura": nomenclatura,
-            "espacios_creados": espacios_creados
+            "mapaParqueadero": {
+                "mapaSize": mapa_size,
+                "nomenclatura": nomenclatura,
+                "espacios": espacios_creados
+            }
         }, status=status.HTTP_200_OK)
 
 
