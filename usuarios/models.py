@@ -97,7 +97,12 @@ class EspacioParqueadero(models.Model):
     ESTADO_CHOICES = [
         ('Disponible', 'Disponible'),
         ('Ocupado', 'Ocupado'),
-        ('Fuera de servicio', 'Fuera de servicio'),
+        ('Deshabilitado', 'Deshabilitado'),
+    ]
+
+    NOMENCLATURA_CHOICES = [
+        ('Numerica', 'Numerica'),
+        ('Alfanumerica', 'Alfanumerica'),
     ]
 
     id_espacio = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -106,6 +111,11 @@ class EspacioParqueadero(models.Model):
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
     fila = models.IntegerField(null=False) 
     columna = models.IntegerField(null=False)
+    nomenclatura = models.CharField(
+        max_length=20,
+        choices=NOMENCLATURA_CHOICES,
+        default='Numérica'
+    )
 
     def __str__(self):
         return f'Espacio {self.numero_espacio} en {self.id_parqueadero.nombre}'
