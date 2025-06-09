@@ -92,33 +92,31 @@ class Parqueadero(models.Model):
     def __str__(self):
         return self.nombre
 
+class MapaParqueadero(models.Model):
+    parqueadero = models.OneToOneField(Parqueadero, on_delete=models.CASCADE, related_name='mapa')
+    filas = models.IntegerField()
+    columnas = models.IntegerField()
+    nomenclatura = models.CharField(max_length=20, choices=[('Numerica', 'Numerica'), ('Alfanumerica', 'Alfanumerica')])
+
+    def __str__(self):
+        return f'Mapa de {self.parqueadero.nombre}'
 
 class EspacioParqueadero(models.Model):
     ESTADO_CHOICES = [
         ('Disponible', 'Disponible'),
-        ('Ocupado', 'Ocupado'),
         ('Deshabilitado', 'Deshabilitado'),
     ]
 
-    NOMENCLATURA_CHOICES = [
-        ('Numerica', 'Numerica'),
-        ('Alfanumerica', 'Alfanumerica'),
-    ]
-
     id_espacio = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    id_parqueadero = models.ForeignKey(Parqueadero, on_delete=models.CASCADE)
-    numero_espacio = models.CharField(max_length=50)
+    mapa = models.ForeignKey(MapaParqueadero, on_delete=models.CASCADE, related_name='espacios')
+    espacio = models.CharField(max_length=50)  # nombre/etiqueta del espacio, como "A1" o "01"
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
     fila = models.IntegerField(null=False) 
     columna = models.IntegerField(null=False)
-    nomenclatura = models.CharField(
-        max_length=20,
-        choices=NOMENCLATURA_CHOICES,
-        default='Numérica'
-    )
 
     def __str__(self):
-        return f'Espacio {self.numero_espacio} en {self.id_parqueadero.nombre}'
+        return f'Espacio {self.espacio} en {self.mapa.parqueadero.nombre}'
+
 
 class Reserva(models.Model):
     ESTADO_CHOICES = [

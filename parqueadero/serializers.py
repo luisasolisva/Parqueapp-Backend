@@ -1,17 +1,34 @@
 
 
 from rest_framework import serializers
-from usuarios.models import Parqueadero
+from usuarios.models import Parqueadero, MapaParqueadero, EspacioParqueadero
 
 
 class ParqueaderoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Parqueadero
         fields = ['id_parqueadero', 'nombre', 'direccion', 'ciudad', 'latitud', 'longitud', 'precio_hora']
+        
+
+class EspacioParqueaderoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EspacioParqueadero
+        fields = ['fila', 'columna', 'espacio', 'estado']
+
+class EspacioEstadoUpdateSerializer(serializers.Serializer):
+    fila = serializers.IntegerField(min_value=0)
+    columna = serializers.IntegerField(min_value=0)
+    estado = serializers.ChoiceField(choices=["Disponible", "Deshabilitado"])
 
 
+class MapaSizeSerializer(serializers.Serializer):
+    filas = serializers.IntegerField(min_value=1)
+    columnas = serializers.IntegerField(min_value=1)
 
-
+class MapaParqueaderoSerializer(serializers.Serializer):
+    mapaSize = MapaSizeSerializer()
+    nomenclatura = serializers.ChoiceField(choices=["Numerica", "Alfanumerica"])
+    espacios = EspacioParqueaderoSerializer(many=True)
 
 
 class CeldaSerializer(serializers.Serializer):
@@ -29,7 +46,6 @@ import cloudinary
 import cloudinary.uploader
 
 from rest_framework import serializers
-from usuarios.models import Parqueadero
 from parqueadero.utils import validar_imagen
 from django.db import IntegrityError
 
