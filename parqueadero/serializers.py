@@ -15,6 +15,12 @@ class EspacioParqueaderoSerializer(serializers.ModelSerializer):
         model = EspacioParqueadero
         fields = ['fila', 'columna', 'espacio', 'estado']
 
+class EspacioEstadoUpdateSerializer(serializers.Serializer):
+    fila = serializers.IntegerField(min_value=0)
+    columna = serializers.IntegerField(min_value=0)
+    estado = serializers.ChoiceField(choices=["Disponible", "Deshabilitado"])
+
+
 class MapaSizeSerializer(serializers.Serializer):
     filas = serializers.IntegerField(min_value=1)
     columnas = serializers.IntegerField(min_value=1)

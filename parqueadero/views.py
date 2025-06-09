@@ -384,7 +384,92 @@ class ObtenerMapaParqueaderoView(APIView):
 
         return Response(respuesta, status=status.HTTP_200_OK)
 
+# views.py
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
+from usuarios.models import Parqueadero, MapaParqueadero, EspacioParqueadero
+from .serializers import EspacioEstadoUpdateSerializer
 
+
+class CambiarEstadoEspaciosView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, id_parqueadero):
+        if request.user.tipo_usuario != "Admin":
+            return Response(
+                {"error": "Solo administradores pueden modificar el estado de los espacios."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        try:
+            parqueadero = Parqueadero.objects.get(id_parqueadero=id_parqueadero)
+        except Parqueadero.DoesNotExist:
+            return Response(
+                {"error": "Parqueadero no encontrado."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        mapa = MapaParqueadero.objects.filter(parqueadero=parqueadero).first()
+        if not mapa:
+            return Response(
+                {"error": "Este parqueadero no tiene un mapa registrado."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        data = request.data.get("espacios")
+        if not data:
+            return Response(
+                {"error": "Debe enviar al menos un espacio a modificar bajo la clave 'espacios'."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Aceptar lista o diccionario individual
+        if isinstance(data, dict):
+            data = [data]
+        elif not isinstance(data, list):
+            return Response(
+                {"error": "El campo 'espacios' debe ser un objeto o una lista de objetos."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        errores = []
+        actualizados = []
+
+        for idx, espacio_data in enumerate(data):
+            serializer = EspacioEstadoUpdateSerializer(data=espacio_data)
+            if not serializer.is_valid():
+                errores.append(f"Ítem {idx + 1}: {serializer.errors}")
+                continue
+
+            valid_data = serializer.validated_data
+            fila = valid_data["fila"]
+            columna = valid_data["columna"]
+            estado = valid_data["estado"]
+
+            try:
+                espacio = EspacioParqueadero.objects.get(mapa=mapa, fila=fila, columna=columna)
+                espacio.estado = estado
+                espacio.save()
+                actualizados.append(f"({fila},{columna}) → '{estado}'")
+            except EspacioParqueadero.DoesNotExist:
+                errores.append(f"Espacio en fila {fila}, columna {columna} no encontrado.")
+
+        if errores:
+            return Response(
+                {
+                    "mensaje": "Algunos espacios no se pudieron actualizar.",
+                    "actualizados": actualizados,
+                    "errores": errores
+                },
+                status=status.HTTP_207_MULTI_STATUS
+            )
+
+        return Response(
+            {"mensaje": "Espacios actualizados correctamente.", "actualizados": actualizados},
+            status=status.HTTP_200_OK
+        )
 
 
 from rest_framework.views import APIView
