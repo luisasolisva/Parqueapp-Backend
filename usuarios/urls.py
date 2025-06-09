@@ -7,14 +7,16 @@ from .views import SendResetCodeView, VerifyResetCodeView, ResetPasswordView, Us
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
+    TokenVerifyView 
 )
 
 urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
     path('register/', RegisterView.as_view(), name='registro'),
-    path('obtener-token/', TokenObtainPairView.as_view(), name='obtener_token'),
     path('activar-cuenta/<uidb64>/<token>/', VistaActivacionCuenta.as_view(), name='activar_cuenta'),
-    path('token/renovar/', TokenRefreshView.as_view(), name='renovar_token'),
+    path('obtener-token/', TokenObtainPairView.as_view(), name='obtener_token'),
+    path('verificar-token/', TokenVerifyView .as_view(), name='verificar_token'),
+    path('renovar-token/', TokenRefreshView.as_view(), name='renovar_token'),
     path('send-reset-code/', SendResetCodeView.as_view(), name='send_reset_code'),
     path('verify-reset-code/', VerifyResetCodeView.as_view(), name='verify_reset_code'),
     path('reset-password/', ResetPasswordView.as_view(), name='password_reset_confirm'),
