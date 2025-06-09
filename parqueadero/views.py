@@ -337,6 +337,54 @@ class CrearMapaParqueaderoView(APIView):
             "mensaje": "Mapa creado exitosamente."
         }, status=status.HTTP_201_CREATED)
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from usuarios.models import Parqueadero, MapaParqueadero, EspacioParqueadero
+
+class ObtenerMapaParqueaderoView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, id_parqueadero):
+        try:
+            parqueadero = Parqueadero.objects.get(id_parqueadero=id_parqueadero)
+        except Parqueadero.DoesNotExist:
+            return Response(
+                {"error": "Parqueadero no encontrado."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        mapa = MapaParqueadero.objects.filter(parqueadero=parqueadero).first()
+
+        if not mapa:
+            return Response(
+                {"error": "Este parqueadero no tiene un mapa registrado."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        espacios = EspacioParqueadero.objects.filter(mapa=mapa)
+
+        respuesta = {
+            "mapaSize": {
+                "filas": mapa.filas,
+                "columnas": mapa.columnas
+            },
+            "nomenclatura": mapa.nomenclatura,
+            "espacios": [
+                {
+                    "fila": espacio.fila,
+                    "columna": espacio.columna,
+                    "espacio": espacio.espacio,
+                    "estado": espacio.estado
+                } for espacio in espacios
+            ]
+        }
+
+        return Response(respuesta, status=status.HTTP_200_OK)
+
+
 
 
 from rest_framework.views import APIView
