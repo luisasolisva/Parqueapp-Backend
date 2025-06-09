@@ -265,8 +265,15 @@ class ModificarParqueaderoView(APIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from usuarios.models import Parqueadero, MapaParqueadero, EspacioParqueadero
+from .serializers import MapaParqueaderoSerializer  
 
-class crearmapaView(APIView):
+class CrearMapaParqueaderoView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, id_parqueadero):
@@ -275,56 +282,61 @@ class crearmapaView(APIView):
         if request.user.tipo_usuario != "Admin":
             return Response({"error": "Solo administradores pueden modificar los espacios."}, status=status.HTTP_403_FORBIDDEN)
 
-        datos_mapa = request.data.get("mapaParqueadero")
-        if not datos_mapa or "espacios" not in datos_mapa:
-            return Response({"error": "Debes proporcionar la estructura completa del mapa."}, status=status.HTTP_400_BAD_REQUEST)
+        # Valida el serializer con los datos recibidos
+        serializer = MapaParqueaderoSerializer(data=request.data.get("mapaParqueadero"))
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        espacios = datos_mapa["espacios"]
-        mapa_size = datos_mapa.get("mapaSize", {})
-        nomenclatura = datos_mapa.get("nomenclatura", "Numerica")
+        data = serializer.validated_data
+        filas = data["mapaSize"]["filas"]
+        columnas = data["mapaSize"]["columnas"]
+        nomenclatura = data["nomenclatura"]
+        espacios_data = data["espacios"]
 
-        if nomenclatura not in dict(EspacioParqueadero.NOMENCLATURA_CHOICES):
-            return Response({"error": "Nomenclatura no válida. Usa 'Numerica' o 'Alfanumerica'."}, status=status.HTTP_400_BAD_REQUEST)
+        # Validaciones adicionales
+        if filas <= 0 or columnas <= 0:
+            return Response({"error": "Filas y columnas deben ser mayores a cero."}, status=status.HTTP_400_BAD_REQUEST)
 
-        estados_permitidos = ["Disponible", "Ocupado", "Deshabilitado"]
-        espacios_creados = []
+        estados_permitidos = ["Disponible", "Deshabilitado"]
+        errores_espacios = []
 
-        for espacio in espacios:
-            if not all(key in espacio for key in ["fila", "columna", "espacio", "estado"]):
-                return Response({"error": "Cada espacio debe incluir fila, columna, número de espacio y estado."}, status=status.HTTP_400_BAD_REQUEST)
+        for idx, espacio in enumerate(espacios_data):
+            if espacio["estado"] not in estados_permitidos:
+                errores_espacios.append(f"Espacio '{espacio['espacio']}': estado inválido '{espacio['estado']}'.")
+            if espacio["fila"] < 0 or espacio["columna"] < 0:
+                errores_espacios.append(f"Espacio '{espacio['espacio']}': fila y columna deben ser >= 0.")
+            if espacio["fila"] >= filas or espacio["columna"] >= columnas:
+                errores_espacios.append(
+                    f"Espacio '{espacio['espacio']}': fuera de los límites del mapa ({filas}x{columnas})."
+                )
 
-            if espacio["estado"].capitalize() not in estados_permitidos:
-                return Response({"error": f"Estado '{espacio['estado']}' no es válido. Solo se permiten: {', '.join(estados_permitidos)}"}, status=status.HTTP_400_BAD_REQUEST)
+        if errores_espacios:
+            return Response({"error": "Errores en los espacios:", "detalles": errores_espacios}, status=status.HTTP_400_BAD_REQUEST)
 
-            try:
-                fila = int(espacio["fila"])
-                columna = int(espacio["columna"])
-            except ValueError:
-                return Response({"error": "Los valores de fila y columna deben ser números."}, status=status.HTTP_400_BAD_REQUEST)
+        # Borra el mapa anterior si existe
+        MapaParqueadero.objects.filter(parqueadero=parqueadero).delete()
 
-            espacio_obj = EspacioParqueadero.objects.create(
-                id_parqueadero=parqueadero,
-                numero_espacio=espacio["espacio"],
-                fila=fila,
-                columna=columna,
-                estado=espacio["estado"].capitalize(),
-                nomenclatura=nomenclatura
+        # Crear nuevo mapa
+        mapa = MapaParqueadero.objects.create(
+            parqueadero=parqueadero,
+            filas=filas,
+            columnas=columnas,
+            nomenclatura=nomenclatura
+        )
+
+        for espacio in espacios_data:
+            EspacioParqueadero.objects.create(
+                mapa=mapa,
+                espacio=espacio["espacio"],
+                fila=espacio["fila"],
+                columna=espacio["columna"],
+                estado=espacio["estado"]
             )
 
-            espacios_creados.append({
-                "fila": espacio_obj.fila,
-                "columna": espacio_obj.columna,
-                "espacio": espacio_obj.numero_espacio,
-                "estado": espacio_obj.estado
-            })
-
         return Response({
-            "mapaParqueadero": {
-                "mapaSize": mapa_size,
-                "nomenclatura": nomenclatura,
-                "espacios": espacios_creados
-            }
-        }, status=status.HTTP_200_OK)
+            "mensaje": "Mapa creado exitosamente."
+        }, status=status.HTTP_201_CREATED)
+
 
 
 from rest_framework.views import APIView
