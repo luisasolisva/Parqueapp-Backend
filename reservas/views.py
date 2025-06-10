@@ -158,9 +158,8 @@ class CrearReservaView(APIView):
             }, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-from datetime import datetime
+    
+from django.utils import timezone
 from django.core.mail import send_mail
 
 class CancelarReservaView(APIView):
@@ -172,34 +171,54 @@ class CancelarReservaView(APIView):
         if reserva.cliente != request.user:
             return Response({"error": "Solo el dueño de la reserva puede cancelarla."}, status=status.HTTP_403_FORBIDDEN)
 
-        # Obtener fecha y hora actual
-        ahora = datetime.now()
+        # Obtener fecha y hora actual con la zona horaria correcta
+        ahora = timezone.now()
+        hora_inicio_reserva = timezone.make_aware(datetime.combine(reserva.fecha_inicio, reserva.hora_inicio))
 
-        # Combinar fecha y hora de la reserva
-        hora_inicio_reserva = datetime.combine(reserva.fecha_inicio, reserva.hora_inicio)
-
-        # Comparar fecha y hora completas
+        # Validar que la reserva aún no haya iniciado
         if ahora >= hora_inicio_reserva:
             return Response({"error": "No puedes cancelar una reserva después de la hora de inicio."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Lógica de cancelación
-        reserva.id_espacio.estado = "Disponible"
-        reserva.id_espacio.save()
-        reserva.estado = "Cancelada"
-        reserva.save()
+        # Aplicar política de penalización o reembolso si está definida
+        penalizacion = reserva.tipo_reserva.penalizacion if hasattr(reserva.tipo_reserva, "penalizacion") else None
+        reembolso = reserva.tipo_reserva.reembolso if hasattr(reserva.tipo_reserva, "reembolso") else None
+
+        # Cancelar reserva y liberar espacio en una sola operación
+        Reserva.objects.filter(id_reserva=id_reserva).update(estado="Cancelada")
+        EspacioParqueadero.objects.filter(id_espacio=reserva.id_espacio.id_espacio).update(estado="Disponible")
 
         # Enviar correo de cancelación
         send_mail(
             "Cancelación de reserva",
-            f"Tu reserva ha sido cancelada.\nID: {reserva.id_reserva}",
+            f"""
+            Estimado {request.user.username},
+
+            Tu reserva ha sido cancelada exitosamente. 
+
+            Detalles:
+            - ID de Reserva: {reserva.id_reserva}
+            - Espacio: {reserva.id_espacio.numero_espacio}
+            - Fecha y Hora: {reserva.fecha_inicio} {reserva.hora_inicio}
+
+            {f"⚠️ Penalización aplicada: {penalizacion}" if penalizacion else ""}
+            {f"💰 Reembolso disponible: {reembolso}" if reembolso else ""}
+
+            Gracias por usar ParqueApp.
+
+            ParqueApp Team
+            """,
             "parqueappreservas@gmail.com",
             [request.user.email],
             fail_silently=False,
         )
 
-        return Response({"mensaje": "Reserva cancelada exitosamente."}, status=status.HTTP_200_OK)
-
-
+        return Response({
+            "mensaje": "Reserva cancelada exitosamente.",
+            "id_reserva": str(reserva.id_reserva),
+            "espacio_liberado": reserva.id_espacio.numero_espacio,
+            "penalizacion": penalizacion,
+            "reembolso": reembolso
+        }, status=status.HTTP_200_OK)
 
 
 
@@ -295,4 +314,79 @@ class ValidarReservaView(APIView):
             "fecha_inicio": reserva.fecha_inicio,
             "hora_inicio": reserva.hora_inicio,
             "estado": reserva.estado
+        }, status=status.HTTP_200_OK)
+
+
+from django.utils import timezone
+from django.core.mail import send_mail
+
+class ModificarReservaView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, id_reserva):
+        reserva = get_object_or_404(Reserva, id_reserva=id_reserva)
+
+        if reserva.cliente != request.user:
+            return Response({"error": "Solo el dueño de la reserva puede modificarla."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Validar que la reserva aún no haya iniciado
+        ahora = timezone.now()
+        hora_inicio_reserva = timezone.make_aware(datetime.combine(reserva.fecha_inicio, reserva.hora_inicio))
+        if ahora >= hora_inicio_reserva:
+            return Response({"error": "No puedes modificar una reserva después de la hora de inicio."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Obtener nuevos datos de la solicitud
+        nueva_fecha = request.data.get("fecha_inicio")
+        nueva_hora = request.data.get("hora_inicio")
+        nuevo_espacio_id = request.data.get("nuevo_espacio")
+
+        # Validar si el nuevo espacio está disponible
+        if nuevo_espacio_id:
+            nuevo_espacio = get_object_or_404(EspacioParqueadero, id_espacio=nuevo_espacio_id)
+            if nuevo_espacio.estado != "Disponible":
+                return Response({"error": f"El espacio {nuevo_espacio.numero_espacio} no está disponible."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Liberar espacio anterior y asignar nuevo
+            reserva.id_espacio.estado = "Disponible"
+            reserva.id_espacio.save()
+            reserva.id_espacio = nuevo_espacio
+            reserva.id_espacio.estado = "Ocupado"
+            reserva.id_espacio.save()
+
+        # Actualizar fecha y hora si se enviaron
+        if nueva_fecha:
+            reserva.fecha_inicio = nueva_fecha
+        if nueva_hora:
+            reserva.hora_inicio = nueva_hora
+
+        reserva.save()
+
+        # Enviar correo de confirmación de modificación
+        send_mail(
+            "Modificación de reserva",
+            f"""
+            Estimado {request.user.username},
+
+            Tu reserva ha sido modificada exitosamente. 
+
+            Nuevos detalles:
+            - ID de Reserva: {reserva.id_reserva}
+            - Nuevo Espacio: {reserva.id_espacio.numero_espacio}
+            - Nueva Fecha y Hora: {reserva.fecha_inicio} {reserva.hora_inicio}
+
+            Gracias por usar ParqueApp.
+
+            ParqueApp Team
+            """,
+            "parqueappreservas@gmail.com",
+            [request.user.email],
+            fail_silently=False,
+        )
+
+        return Response({
+            "mensaje": "Reserva modificada exitosamente.",
+            "id_reserva": str(reserva.id_reserva),
+            "nuevo_espacio": reserva.id_espacio.numero_espacio,
+            "nueva_fecha": reserva.fecha_inicio,
+            "nueva_hora": reserva.hora_inicio
         }, status=status.HTTP_200_OK)

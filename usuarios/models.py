@@ -125,31 +125,23 @@ class Reserva(models.Model):
         ('Cancelada', 'Cancelada'),
         ('Finalizada', 'Finalizada'),
     ]
-    TIPO_VEHICULO_CHOICES = [
-        ('Carro', 'Carro'),
-        ('Moto', 'Moto'),
-        ('Bicicleta', 'Bicicleta'),
-    ]
 
     id_reserva = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     cliente = models.ForeignKey(Usuario, on_delete=models.CASCADE, db_column="cliente_id")
     id_parqueadero = models.ForeignKey(Parqueadero, on_delete=models.CASCADE, db_column="parqueadero_id")
     id_espacio = models.ForeignKey(EspacioParqueadero, on_delete=models.CASCADE, db_column="espacio_id")
+    vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE, db_column="vehiculo_id")  # ✅ Relación con Vehiculo
     fecha_inicio = models.DateField()
     hora_inicio = models.TimeField()
     fecha_fin = models.DateField()
     hora_fin = models.TimeField()
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
-    monto_total = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)  # ✅ Asegura un valor por defecto
-    placa = models.CharField(max_length=10)
-    color = models.CharField(max_length=20)
-    modelo = models.CharField(max_length=50)
-    tipo_vehiculo = models.CharField(max_length=20, choices=TIPO_VEHICULO_CHOICES)
-    codigo_qr_texto = models.TextField(blank=True, null=True)  # ✅ Nuevo campo para almacenar el QR en texto
-
+    monto_total = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
+    codigo_qr_texto = models.TextField(blank=True, null=True)
 
     def __str__(self):
-        return f'Reserva {self.id_reserva} de {self.cliente}'
+        return f'Reserva {self.id_reserva} de {self.cliente} - Vehículo {self.vehiculo.placa}'
+
 
 
 class Pago(models.Model):
@@ -187,17 +179,24 @@ class Reseña(models.Model):
     def __str__(self):
         return f'Reseña de {self.id_usuario} para {self.id_parqueadero}'
 
-
 class Vehiculo(models.Model):
+    TIPO_VEHICULO_CHOICES = [
+        ('Carro', 'Carro'),
+        ('Moto', 'Moto'),
+        ('Bicicleta', 'Bicicleta'),
+    ]
+
     id_vehiculo = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     id_usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
     placa = models.CharField(max_length=10)
     marca = models.CharField(max_length=100)
     modelo = models.CharField(max_length=100)
     color = models.CharField(max_length=50)
+    tipo_vehiculo = models.CharField(max_length=20, choices=TIPO_VEHICULO_CHOICES)  # ✅ Nuevo campo
 
     def __str__(self):
-        return self.placa
+        return f'{self.placa} - {self.tipo_vehiculo}'
+
 
 
 class Cancelacion(models.Model):
