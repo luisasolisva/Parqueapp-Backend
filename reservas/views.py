@@ -284,8 +284,15 @@ class ValidarReservaView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-from django.utils import timezone
-from django.core.mail import send_mail
+
+
+
+
+
+
+
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
 
 class ModificarReservaView(APIView):
     permission_classes = [IsAuthenticated]
@@ -296,31 +303,26 @@ class ModificarReservaView(APIView):
         if reserva.cliente != request.user:
             return Response({"error": "Solo el dueño de la reserva puede modificarla."}, status=status.HTTP_403_FORBIDDEN)
 
-        # Validar que la reserva aún no haya iniciado
         ahora = timezone.now()
         hora_inicio_reserva = timezone.make_aware(datetime.combine(reserva.fecha_inicio, reserva.hora_inicio))
         if ahora >= hora_inicio_reserva:
             return Response({"error": "No puedes modificar una reserva después de la hora de inicio."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Obtener nuevos datos de la solicitud
         nueva_fecha = request.data.get("fecha_inicio")
         nueva_hora = request.data.get("hora_inicio")
         nuevo_espacio_id = request.data.get("nuevo_espacio")
 
-        # Validar si el nuevo espacio está disponible
         if nuevo_espacio_id:
             nuevo_espacio = get_object_or_404(EspacioParqueadero, id_espacio=nuevo_espacio_id)
             if nuevo_espacio.estado != "Disponible":
                 return Response({"error": f"El espacio {nuevo_espacio.numero_espacio} no está disponible."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Liberar espacio anterior y asignar nuevo
             reserva.id_espacio.estado = "Disponible"
             reserva.id_espacio.save()
             reserva.id_espacio = nuevo_espacio
             reserva.id_espacio.estado = "Ocupado"
             reserva.id_espacio.save()
 
-        # Actualizar fecha y hora si se enviaron
         if nueva_fecha:
             reserva.fecha_inicio = nueva_fecha
         if nueva_hora:
@@ -328,25 +330,22 @@ class ModificarReservaView(APIView):
 
         reserva.save()
 
-        # Enviar correo de confirmación de modificación
+        # Renderizar el correo HTML
+        email_html = render_to_string("correo_modificacion.html", {
+            "username": request.user.username,
+            "id_reserva": reserva.id_reserva,
+            "nuevo_espacio": reserva.id_espacio.numero_espacio,
+            "nueva_fecha": reserva.fecha_inicio,
+            "nueva_hora": reserva.hora_inicio,
+        })
+        email_plaintext = strip_tags(email_html)  
+
         send_mail(
             "Modificación de reserva",
-            f"""
-            Estimado {request.user.username},
-
-            Tu reserva ha sido modificada exitosamente. 
-
-            Nuevos detalles:
-            - ID de Reserva: {reserva.id_reserva}
-            - Nuevo Espacio: {reserva.id_espacio.numero_espacio}
-            - Nueva Fecha y Hora: {reserva.fecha_inicio} {reserva.hora_inicio}
-
-            Gracias por usar ParqueApp.
-
-            ParqueApp Team
-            """,
+            email_plaintext,  
             "parqueappreservas@gmail.com",
             [request.user.email],
+            html_message=email_html,  
             fail_silently=False,
         )
 
