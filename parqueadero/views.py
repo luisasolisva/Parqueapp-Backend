@@ -533,8 +533,10 @@ class ParqueaderoDetailView(APIView):
 
                 if parqueadero:
                     serializer = ParqueaderoDetailSerializer(parqueadero)
+                    tiene_mapa = MapaParqueadero.objects.filter(parqueadero=parqueadero).exists()
                     return Response({
                         "tiene_parqueadero": True,
+                        "tiene_mapa": tiene_mapa,
                         "data": serializer.data
                     }, status=status.HTTP_200_OK)
                 else:
