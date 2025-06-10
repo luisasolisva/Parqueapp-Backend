@@ -356,3 +356,28 @@ class ModificarReservaView(APIView):
             "nueva_fecha": reserva.fecha_inicio,
             "nueva_hora": reserva.hora_inicio
         }, status=status.HTTP_200_OK)
+
+
+
+
+
+
+
+
+
+class FinalizarReservaView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, id_reserva):
+        reserva = get_object_or_404(Reserva, id_reserva=id_reserva)
+
+        if reserva.cliente != request.user:
+            return Response({"error": "Solo el dueño de la reserva puede finalizarla."}, status=status.HTTP_403_FORBIDDEN)
+
+        reserva.estado = "Finalizada"
+        reserva.save(update_fields=["estado"])  # ✅ Al guardar, activará la señal en `reservas/signals.py`
+
+        return Response({
+            "mensaje": "Reserva finalizada exitosamente.",
+            "id_reserva": str(reserva.id_reserva)
+        }, status=status.HTTP_200_OK)
