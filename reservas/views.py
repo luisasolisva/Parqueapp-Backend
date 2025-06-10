@@ -32,8 +32,6 @@ class ListaEspaciosDisponiblesView(APIView):
 
         return Response({"espacios_disponibles": data}, status=status.HTTP_200_OK)
 
-
-
 from datetime import datetime
 import qrcode
 from io import BytesIO
@@ -86,6 +84,10 @@ class CrearReservaView(APIView):
         horas_reservadas = (datetime.strptime(request.data["hora_fin"], "%H:%M:%S") - datetime.strptime(request.data["hora_inicio"], "%H:%M:%S")).seconds / 3600
         monto_total = round(horas_reservadas * float(parqueadero.precio_hora), 2)
 
+        # Convertir hora a formato AM/PM
+        hora_inicio_am_pm = datetime.strptime(request.data["hora_inicio"], "%H:%M:%S").strftime("%I:%M %p")
+        hora_fin_am_pm = datetime.strptime(request.data["hora_fin"], "%H:%M:%S").strftime("%I:%M %p")
+
         # Paso 1: Mostrar los detalles antes de la confirmación
         if not request.data.get("confirmar"):
             return Response({
@@ -96,9 +98,9 @@ class CrearReservaView(APIView):
                 "vehiculo": str(vehiculo.id_vehiculo),
                 "tipo_vehiculo": vehiculo.tipo_vehiculo,
                 "fecha_inicio": fecha_inicio,
-                "hora_inicio": hora_inicio,
+                "hora_inicio": hora_inicio_am_pm,  # ✅ Formato AM/PM
                 "fecha_fin": request.data["fecha_fin"],
-                "hora_fin": request.data["hora_fin"],
+                "hora_fin": hora_fin_am_pm,  # ✅ Formato AM/PM
                 "monto_total": monto_total,
                 "confirmar": False
             }, status=status.HTTP_200_OK)
@@ -108,6 +110,8 @@ class CrearReservaView(APIView):
         data["cliente"] = request.user.id
         data["monto_total"] = monto_total
         data["vehiculo"] = vehiculo.id_vehiculo
+        data["hora_inicio_am_pm"] = hora_inicio_am_pm  # ✅ Guardamos en la BD
+        data["hora_fin_am_pm"] = hora_fin_am_pm  # ✅ Guardamos en la BD
 
         serializer = ReservaSerializer(data=data)
         if serializer.is_valid():

@@ -7,10 +7,11 @@ class ReservaSerializer(serializers.ModelSerializer):
         model = Reserva
         fields = [
             "id_reserva", "cliente", "id_parqueadero", "id_espacio",
-            "vehiculo", "fecha_inicio", "hora_inicio", "fecha_fin",
-            "hora_fin", "estado", "monto_total"
+            "vehiculo", "fecha_inicio", "hora_inicio", "hora_inicio_am_pm",
+            "fecha_fin", "hora_fin", "hora_fin_am_pm", "estado", "monto_total"
         ]
         read_only_fields = ["id_reserva", "estado", "monto_total"]
+
 
 
 
