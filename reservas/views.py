@@ -34,11 +34,6 @@ class ListaEspaciosDisponiblesView(APIView):
 
 
 
-
-
-
-
-
 from datetime import datetime
 import qrcode
 from io import BytesIO
@@ -49,8 +44,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
-from usuarios.models import Reserva, EspacioParqueadero, Parqueadero
+from usuarios.models import Reserva, EspacioParqueadero, Parqueadero, Vehiculo
 from .serializers import ReservaSerializer
+
 def generar_qr(texto):
     """Genera un código QR en formato de imagen."""
     qr = qrcode.make(texto)
@@ -74,6 +70,10 @@ class CrearReservaView(APIView):
         if espacio.estado != "Disponible":
             return Response({"error": "El espacio seleccionado no está disponible."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Obtener vehículo del usuario
+        vehiculo_id = request.data.get("vehiculo_id")
+        vehiculo = get_object_or_404(Vehiculo, id_vehiculo=vehiculo_id, id_usuario=request.user)
+
         # Verificar disponibilidad en fecha y hora
         fecha_inicio = request.data.get("fecha_inicio")
         hora_inicio = request.data.get("hora_inicio")
@@ -93,6 +93,8 @@ class CrearReservaView(APIView):
                 "id_parqueadero": str(parqueadero.id_parqueadero),
                 "nombre_parqueadero": parqueadero.nombre,
                 "id_espacio": str(espacio.id_espacio),
+                "vehiculo": str(vehiculo.id_vehiculo),
+                "tipo_vehiculo": vehiculo.tipo_vehiculo,
                 "fecha_inicio": fecha_inicio,
                 "hora_inicio": hora_inicio,
                 "fecha_fin": request.data["fecha_fin"],
@@ -105,19 +107,20 @@ class CrearReservaView(APIView):
         data = request.data.copy()
         data["cliente"] = request.user.id
         data["monto_total"] = monto_total
+        data["vehiculo"] = vehiculo.id_vehiculo
 
         serializer = ReservaSerializer(data=data)
         if serializer.is_valid():
-            reserva = serializer.save(estado="Pendiente", monto_total=data["monto_total"])
-            
+            reserva = serializer.save(estado="Pendiente")
+
             # ✅ Cambiamos el estado a "Confirmada" si el usuario confirmó la reserva
             if request.data.get("confirmar"):
                 reserva.estado = "Confirmada"
                 reserva.save(update_fields=["estado"])
 
-            # ✅ Asignamos correctamente el QR en texto
+            # ✅ Guardamos el código QR en la BD
             reserva.codigo_qr_texto = f"Reserva {reserva.id_reserva}"
-            reserva.save(update_fields=["codigo_qr_texto"])  # ✅ Guardamos solo el código QR en la BD
+            reserva.save(update_fields=["codigo_qr_texto"])
 
             # Generar código QR como imagen
             qr_image = generar_qr(f"Reserva {reserva.id_reserva}")
@@ -126,39 +129,23 @@ class CrearReservaView(APIView):
             espacio.estado = "Reservado"
             espacio.save()
 
-            # Renderizar el correo HTML con los detalles
-            email_html = render_to_string("correo_confirmacion.html", {
-                "id_reserva": reserva.id_reserva,
-                "monto_total": reserva.monto_total,
-                "fecha_inicio": reserva.fecha_inicio,
-                "hora_inicio": reserva.hora_inicio,
-                "nombre_parqueadero": parqueadero.nombre,
-            })
-
-            # Crear correo con HTML
-            email = EmailMessage(
-                "Confirmación de reserva",
-                email_html,
-                "parqueappreservas@gmail.com",
-                [request.user.email],
-            )
-            email.content_subtype = "html"
-
-            # Adjuntar la imagen QR
-            image_attachment = MIMEImage(qr_image)
-            image_attachment.add_header("Content-ID", "<qr_reserva>")
-            email.attach(image_attachment)
-
-            email.send()
-
             return Response({
                 "mensaje": "Reserva creada exitosamente",
                 "id_reserva": str(reserva.id_reserva),
-                "estado": reserva.estado  # ✅ Confirmamos el estado de la reserva en la respuesta
+                "estado": reserva.estado
             }, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
+
+
+
+
+
+
+
+
+
 from django.utils import timezone
 from django.core.mail import send_mail
 
