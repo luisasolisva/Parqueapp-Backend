@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Cancelación de Reserva</title>
+</head>
+<body style="font-family: Arial, sans-serif; padding: 20px; text-align: center;">
+    <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 1px 8px rgba(0, 0, 0, 0.1); max-width: 600px; margin: auto;">
+        <h1 style="color: #D9534F;">¡Tu reserva ha sido cancelada! ❌</h1>
+        <p style="font-size: 16px; color: #333;">Estimado <b>{{ username }}</b>,</p>
+        <p style="font-size: 16px;">Tu reserva ha sido cancelada con éxito.</p>
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px auto;">
+            <p><strong>ID de Reserva:</strong> {{ id_reserva }}</p>
+            <p><strong>Espacio:</strong> {{ espacio }}</p>
+            <p><strong>Fecha y Hora:</strong> {{ fecha_inicio }} {{ hora_inicio }}</p>
+        </div>
+        <p style="font-size: 16px;">Gracias por usar <b>ParqueApp</b>.</p>
+        <hr>
+        <p style="font-size: 12px; color: gray;">© 2025 ParqueApp. Todos los derechos reservados.</p>
+    </div>
+</body>
+</html>

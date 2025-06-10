@@ -142,12 +142,8 @@ class CrearReservaView(APIView):
 
 
 
-
-
-
-
-from django.utils import timezone
-from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
 
 class CancelarReservaView(APIView):
     permission_classes = [IsAuthenticated]
@@ -158,56 +154,40 @@ class CancelarReservaView(APIView):
         if reserva.cliente != request.user:
             return Response({"error": "Solo el dueño de la reserva puede cancelarla."}, status=status.HTTP_403_FORBIDDEN)
 
-        # Obtener fecha y hora actual con la zona horaria correcta
         ahora = timezone.now()
         hora_inicio_reserva = timezone.make_aware(datetime.combine(reserva.fecha_inicio, reserva.hora_inicio))
 
-        # Validar que la reserva aún no haya iniciado
         if ahora >= hora_inicio_reserva:
             return Response({"error": "No puedes cancelar una reserva después de la hora de inicio."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Aplicar política de penalización o reembolso si está definida
-        penalizacion = reserva.tipo_reserva.penalizacion if hasattr(reserva.tipo_reserva, "penalizacion") else None
-        reembolso = reserva.tipo_reserva.reembolso if hasattr(reserva.tipo_reserva, "reembolso") else None
-
-        # Cancelar reserva y liberar espacio en una sola operación
+        # Cancelar reserva y liberar espacio
         Reserva.objects.filter(id_reserva=id_reserva).update(estado="Cancelada")
         EspacioParqueadero.objects.filter(id_espacio=reserva.id_espacio.id_espacio).update(estado="Disponible")
 
-        # Enviar correo de cancelación
+        # Renderizar el correo HTML
+        email_html = render_to_string("correo_cancelacion.html", {
+            "username": request.user.username,
+            "id_reserva": reserva.id_reserva,
+            "espacio": reserva.id_espacio.numero_espacio,
+            "fecha_inicio": reserva.fecha_inicio,
+            "hora_inicio": reserva.hora_inicio,
+        })
+        email_plaintext = strip_tags(email_html)  
+
         send_mail(
             "Cancelación de reserva",
-            f"""
-            Estimado {request.user.username},
-
-            Tu reserva ha sido cancelada exitosamente. 
-
-            Detalles:
-            - ID de Reserva: {reserva.id_reserva}
-            - Espacio: {reserva.id_espacio.numero_espacio}
-            - Fecha y Hora: {reserva.fecha_inicio} {reserva.hora_inicio}
-
-            {f"⚠️ Penalización aplicada: {penalizacion}" if penalizacion else ""}
-            {f"💰 Reembolso disponible: {reembolso}" if reembolso else ""}
-
-            Gracias por usar ParqueApp.
-
-            ParqueApp Team
-            """,
+            email_plaintext,  
             "parqueappreservas@gmail.com",
             [request.user.email],
+            html_message=email_html,  
             fail_silently=False,
         )
 
         return Response({
             "mensaje": "Reserva cancelada exitosamente.",
             "id_reserva": str(reserva.id_reserva),
-            "espacio_liberado": reserva.id_espacio.numero_espacio,
-            "penalizacion": penalizacion,
-            "reembolso": reembolso
+            "espacio_liberado": reserva.id_espacio.numero_espacio
         }, status=status.HTTP_200_OK)
-
-
 
 
 
