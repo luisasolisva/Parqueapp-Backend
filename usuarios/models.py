@@ -52,6 +52,7 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     codigo_restauracion = models.CharField(max_length=4, null=True, blank=True)  # Campo para el código de restauración
     codigo_creado = models.DateTimeField(null=True, blank=True)  # Fecha de creación del código
     codigo_validado = models.BooleanField(default=False) # Estado de validación del código
+    recordatorios_activos = models.BooleanField(default=True)  # ✅ Permite activar/desactivar recordatorios
 
     password = models.CharField(max_length=255)  # ¡Agrega este campo!
 
@@ -116,6 +117,28 @@ class EspacioParqueadero(models.Model):
 
     def __str__(self):
         return f'Espacio {self.espacio} en {self.mapa.parqueadero.nombre}'
+    
+    
+    
+    
+    
+class Vehiculo(models.Model):
+    TIPO_VEHICULO_CHOICES = [
+        ('Carro', 'Carro'),
+        ('Moto', 'Moto'),
+        ('Bicicleta', 'Bicicleta'),
+    ]
+
+    id_vehiculo = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id_usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    placa = models.CharField(max_length=10)
+    marca = models.CharField(max_length=100)
+    modelo = models.CharField(max_length=100)
+    color = models.CharField(max_length=50)
+    tipo_vehiculo = models.CharField(max_length=20, choices=TIPO_VEHICULO_CHOICES)  # ✅ Nuevo campo
+
+    def __str__(self):
+        return f'{self.placa} - {self.tipo_vehiculo}'
 
 
 class Reserva(models.Model):
@@ -179,23 +202,6 @@ class Reseña(models.Model):
     def __str__(self):
         return f'Reseña de {self.id_usuario} para {self.id_parqueadero}'
 
-class Vehiculo(models.Model):
-    TIPO_VEHICULO_CHOICES = [
-        ('Carro', 'Carro'),
-        ('Moto', 'Moto'),
-        ('Bicicleta', 'Bicicleta'),
-    ]
-
-    id_vehiculo = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    id_usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
-    placa = models.CharField(max_length=10)
-    marca = models.CharField(max_length=100)
-    modelo = models.CharField(max_length=100)
-    color = models.CharField(max_length=50)
-    tipo_vehiculo = models.CharField(max_length=20, choices=TIPO_VEHICULO_CHOICES)  # ✅ Nuevo campo
-
-    def __str__(self):
-        return f'{self.placa} - {self.tipo_vehiculo}'
 
 
 
