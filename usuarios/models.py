@@ -119,9 +119,6 @@ class EspacioParqueadero(models.Model):
         return f'Espacio {self.espacio} en {self.mapa.parqueadero.nombre}'
     
     
-    
-    
-    
 class Vehiculo(models.Model):
     TIPO_VEHICULO_CHOICES = [
         ('Carro', 'Carro'),
@@ -138,7 +135,9 @@ class Vehiculo(models.Model):
     tipo_vehiculo = models.CharField(max_length=20, choices=TIPO_VEHICULO_CHOICES)  # ✅ Nuevo campo
 
     def __str__(self):
-        return f'{self.placa} - {self.tipo_vehiculo}'
+        return f'{self.placa} - {self.tipo_vehiculo}'  
+    
+
 
 
 class Reserva(models.Model):

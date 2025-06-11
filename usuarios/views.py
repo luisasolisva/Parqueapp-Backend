@@ -260,3 +260,28 @@ class UserDeleteView(APIView):
             "message": "Your account has been successfully deleted.",
             "deleted_user": serializer.data  
         }, status=status.HTTP_200_OK)
+
+
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.shortcuts import get_object_or_404
+from usuarios.models import Usuario
+
+class ActualizarPreferenciasView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        usuario = get_object_or_404(Usuario, id=request.user.id)
+        recordatorios_activos = request.data.get("recordatorios_activos")
+
+        if recordatorios_activos is None:
+            return Response({"error": "Debes indicar si activas o desactivas los recordatorios."}, status=400)
+
+        usuario.recordatorios_activos = recordatorios_activos
+        usuario.save(update_fields=["recordatorios_activos"])
+
+        estado = "activados" if recordatorios_activos else "desactivados"
+        return Response({"mensaje": f"Los recordatorios han sido {estado} correctamente."}, status=200)

@@ -10,6 +10,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
 from usuarios.models import EspacioParqueadero
+
 class ListaEspaciosDisponiblesView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -20,13 +21,15 @@ class ListaEspaciosDisponiblesView(APIView):
 
         parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
 
-        # Obtener los espacios disponibles desde el modelo `EspacioParqueadero`
-        espacios_disponibles = EspacioParqueadero.objects.filter(id_parqueadero=parqueadero, estado="Disponible")
+        # ✅ Ajuste: Filtrar por `mapa__parqueadero_id` en lugar de `id_parqueadero`
+        espacios_disponibles = EspacioParqueadero.objects.filter(mapa__parqueadero=id_parqueadero, estado="Disponible")
 
-        # Serializar los datos para enviarlos como respuesta
+        # Serializar los datos correctamente
         data = [{
             "id_espacio": str(espacio.id_espacio),
-            "numero_espacio": espacio.numero_espacio,
+            "fila": espacio.fila,
+            "columna": espacio.columna,
+            "espacio": espacio.espacio,
             "estado": espacio.estado
         } for espacio in espacios_disponibles]
 
@@ -359,29 +362,4 @@ class ModificarReservaView(APIView):
             "nuevo_espacio": reserva.id_espacio.numero_espacio,
             "nueva_fecha": reserva.fecha_inicio,
             "nueva_hora": reserva.hora_inicio
-        }, status=status.HTTP_200_OK)
-
-
-
-
-
-
-
-
-
-class FinalizarReservaView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def put(self, request, id_reserva):
-        reserva = get_object_or_404(Reserva, id_reserva=id_reserva)
-
-        if reserva.cliente != request.user:
-            return Response({"error": "Solo el dueño de la reserva puede finalizarla."}, status=status.HTTP_403_FORBIDDEN)
-
-        reserva.estado = "Finalizada"
-        reserva.save(update_fields=["estado"])  # ✅ Al guardar, activará la señal en `reservas/signals.py`
-
-        return Response({
-            "mensaje": "Reserva finalizada exitosamente.",
-            "id_reserva": str(reserva.id_reserva)
         }, status=status.HTTP_200_OK)
