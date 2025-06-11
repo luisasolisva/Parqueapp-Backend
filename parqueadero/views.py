@@ -282,6 +282,13 @@ class CrearMapaParqueaderoView(APIView):
         if request.user.tipo_usuario != "Admin":
             return Response({"error": "Solo administradores pueden modificar los espacios."}, status=status.HTTP_403_FORBIDDEN)
 
+        # Verificar si ya existe un mapa para el parqueadero
+        if MapaParqueadero.objects.filter(parqueadero=parqueadero).exists():
+            return Response(
+                {"error": "Este parqueadero ya tiene un mapa registrado. No se puede crear otro."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         # Valida el serializer con los datos recibidos
         serializer = MapaParqueaderoSerializer(data=request.data.get("mapaParqueadero"))
         if not serializer.is_valid():
@@ -312,9 +319,6 @@ class CrearMapaParqueaderoView(APIView):
 
         if errores_espacios:
             return Response({"error": "Errores en los espacios:", "detalles": errores_espacios}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Borra el mapa anterior si existe
-        MapaParqueadero.objects.filter(parqueadero=parqueadero).delete()
 
         # Crear nuevo mapa
         mapa = MapaParqueadero.objects.create(
@@ -529,8 +533,10 @@ class ParqueaderoDetailView(APIView):
 
                 if parqueadero:
                     serializer = ParqueaderoDetailSerializer(parqueadero)
+                    tiene_mapa = MapaParqueadero.objects.filter(parqueadero=parqueadero).exists()
                     return Response({
                         "tiene_parqueadero": True,
+                        "tiene_mapa": tiene_mapa,
                         "data": serializer.data
                     }, status=status.HTTP_200_OK)
                 else:
