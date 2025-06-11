@@ -2,7 +2,7 @@ from django.urls import path
 from .views import ParqueaderosCercanosView
 from .views import RegistrarParqueaderoView, lista_parqueaderos
 from .views import ModificarParqueaderoView, VerEspaciosParqueaderoView,EliminarParqueaderoView
-from .views import CambiarEstadoEspaciosView, ObtenerMapaParqueaderoView, CrearMapaParqueaderoView, ModificarEspaciosParqueaderoView, EstadisticasAdminView, ParqueaderoDetailView
+from .views import ModificarMapaParqueaderoView, CambiarEstadoEspaciosView, ObtenerMapaParqueaderoView, CrearMapaParqueaderoView, ModificarEspaciosParqueaderoView, EstadisticasAdminView, ParqueaderoDetailView
 from . import views
 
 
@@ -12,6 +12,7 @@ urlpatterns = [
     path('listar/', lista_parqueaderos, name='lista_parqueaderos'),
     path('modificar/<uuid:id_parqueadero>/', ModificarParqueaderoView.as_view(), name='modificar_parqueadero'),
     path('crear-mapa/<uuid:id_parqueadero>/', CrearMapaParqueaderoView.as_view(), name='crear-mapa'),
+    path('modificar-mapa/<uuid:id_parqueadero>/', ModificarMapaParqueaderoView.as_view(), name='modificar_mapa_parqueadero'),
     path('obtener-mapa/<uuid:id_parqueadero>/', ObtenerMapaParqueaderoView.as_view(), name='obtener-mapa'),
     path('cambiar-estado-espacios/<uuid:id_parqueadero>/', CambiarEstadoEspaciosView.as_view(), name='cambiar-estado-espacios'),
     path('estadisticas/<uuid:id_parqueadero>/', EstadisticasAdminView.as_view(), name='Estadisticas'),

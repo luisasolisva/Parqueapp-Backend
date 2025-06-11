@@ -341,6 +341,72 @@ class CrearMapaParqueaderoView(APIView):
             "mensaje": "Mapa creado exitosamente."
         }, status=status.HTTP_201_CREATED)
 
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from django.shortcuts import get_object_or_404
+from django.db import transaction  # transacción atómica
+
+class ModificarMapaParqueaderoView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, id_parqueadero):
+        parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+
+        if request.user.tipo_usuario != "Admin":
+            return Response({"error": "Solo administradores pueden modificar el mapa."}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = MapaParqueaderoSerializer(data=request.data.get("mapaParqueadero"))
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+        filas = data['mapaSize']['filas']
+        columnas = data['mapaSize']['columnas']
+        nomenclatura = data['nomenclatura']
+        espacios_data = data['espacios']
+
+        # Validaciones adicionales de lógica de negocio
+        errores_espacios = []
+        for espacio in espacios_data:
+            if espacio["fila"] >= filas or espacio["columna"] >= columnas:
+                errores_espacios.append(f"Espacio '{espacio['espacio']}' está fuera de los límites del mapa ({filas}x{columnas}).")
+
+        if errores_espacios:
+            return Response({"errores": errores_espacios}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with transaction.atomic():
+                # Borrar mapa anterior
+                MapaParqueadero.objects.filter(parqueadero=parqueadero).delete()
+
+                # Crear nuevo mapa
+                mapa = MapaParqueadero.objects.create(
+                    parqueadero=parqueadero,
+                    filas=filas,
+                    columnas=columnas,
+                    nomenclatura=nomenclatura
+                )
+
+                # Crear nuevos espacios
+                for espacio in espacios_data:
+                    EspacioParqueadero.objects.create(
+                        mapa=mapa,
+                        espacio=espacio["espacio"],
+                        fila=espacio["fila"],
+                        columna=espacio["columna"],
+                        estado=espacio["estado"]
+                    )
+
+            return Response({"mensaje": "Mapa modificado exitosamente."}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": f"Ocurrió un error inesperado: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
