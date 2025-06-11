@@ -105,7 +105,7 @@ CORS_ALLOW_ALL_ORIGINS = True #Solo en Desarrollo
 
 #Desarrollo & Produccion
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "DELETE"]
+CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH" ]
 CORS_ALLOW_HEADERS = ["Authorization", "Content-Type", "headers"]
 
 
