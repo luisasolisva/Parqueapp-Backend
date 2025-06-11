@@ -138,7 +138,7 @@ class Vehiculo(models.Model):
         return f'{self.placa} - {self.tipo_vehiculo}'  
     
 
-
+from django.utils.timezone import now
 
 class Reserva(models.Model):
     ESTADO_CHOICES = [
@@ -152,7 +152,7 @@ class Reserva(models.Model):
     cliente = models.ForeignKey(Usuario, on_delete=models.CASCADE, db_column="cliente_id")
     id_parqueadero = models.ForeignKey(Parqueadero, on_delete=models.CASCADE, db_column="parqueadero_id")
     id_espacio = models.ForeignKey(EspacioParqueadero, on_delete=models.CASCADE, db_column="espacio_id")
-    vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE, db_column="vehiculo_id")  # ✅ Relación con Vehiculo
+    vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE, db_column="vehiculo_id")
     fecha_inicio = models.DateField()
     hora_inicio = models.TimeField()
     fecha_fin = models.DateField()
@@ -164,6 +164,19 @@ class Reserva(models.Model):
     def __str__(self):
         return f'Reserva {self.id_reserva} de {self.cliente} - Vehículo {self.vehiculo.placa}'
 
+    def ha_finalizado(self):
+        """Verifica si la reserva ha finalizado comparando `hora_fin` con la hora actual."""
+        return now().time() > self.hora_fin
+
+    @property
+    def hora_inicio_am_pm(self):
+        """Transforma `hora_inicio` a formato AM/PM sin guardarlo en la BD."""
+        return self.hora_inicio.strftime("%I:%M %p")
+
+    @property
+    def hora_fin_am_pm(self):
+        """Transforma `hora_fin` a formato AM/PM sin guardarlo en la BD."""
+        return self.hora_fin.strftime("%I:%M %p")
 
 
 class Pago(models.Model):
