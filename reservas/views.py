@@ -34,14 +34,14 @@ class ListaEspaciosDisponiblesView(APIView):
         } for espacio in espacios_disponibles]
 
         return Response({"espacios_disponibles": data}, status=status.HTTP_200_OK)
-
-
+    
+    
 from datetime import datetime
 import qrcode
 from io import BytesIO
 from django.template.loader import render_to_string
 from django.core.mail import EmailMessage
-from email.mime.image import MIMEImage
+from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -66,11 +66,19 @@ class CrearReservaView(APIView):
         parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
         espacio = get_object_or_404(EspacioParqueadero, id_espacio=id_espacio, mapa__parqueadero=parqueadero)
 
-        # ✅ Corrección 1: Validar que el espacio esté disponible antes de cualquier otro proceso
+        # ✅ 1️⃣ Verificar disponibilidad del espacio antes de continuar
         if espacio.estado != "Disponible":
             return Response({"error": "El espacio seleccionado no está disponible."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Obtener datos del vehículo
+        # ✅ 2️⃣ Verificar si el usuario ya tiene una reserva activa
+        reserva_activa = Reserva.objects.filter(cliente=request.user, estado__in=["Pendiente", "Confirmada"]).exists()
+        if reserva_activa:
+            return Response({"error": "Ya tienes una reserva activa y no puedes crear otra."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # ✅ 3️⃣ Capturar todos los errores en un solo mensaje
+        errores = {}
+
+        # Validar datos del vehículo
         placa = request.data.get("placa")
         marca = request.data.get("marca")
         modelo = request.data.get("modelo")
@@ -78,8 +86,30 @@ class CrearReservaView(APIView):
         tipo_vehiculo = request.data.get("tipo_vehiculo")
 
         if not all([placa, marca, modelo, color, tipo_vehiculo]):
-            return Response({"error": "Debes proporcionar todos los datos del vehículo."}, status=status.HTTP_400_BAD_REQUEST)
+            errores["vehiculo"] = "Debes proporcionar todos los datos del vehículo."
 
+        # Validar formato de fecha y hora
+        fecha_inicio = request.data.get("fecha_inicio")
+        fecha_fin = request.data.get("fecha_fin")
+        hora_inicio = request.data.get("hora_inicio")
+        hora_fin = request.data.get("hora_fin")
+
+        try:
+            hora_inicio = datetime.strptime(hora_inicio, "%I:%M %p").time()
+            hora_fin = datetime.strptime(hora_fin, "%I:%M %p").time()
+        except ValueError:
+            errores["hora_inicio/hora_fin"] = "Formato de hora incorrecto. Usa 'HH:MM AM/PM'."
+
+        # Verificar disponibilidad en fecha y hora
+        reservas_existentes = Reserva.objects.filter(id_espacio=espacio, fecha_inicio=fecha_inicio, hora_inicio=hora_inicio)
+        if reservas_existentes.exists():
+            errores["reserva"] = "Este espacio ya está reservado para la fecha y hora seleccionadas."
+
+        # ✅ Si hay errores, devolverlos todos en una sola respuesta
+        if errores:
+            return Response({"errores": errores}, status=status.HTTP_400_BAD_REQUEST)
+
+        # ✅ 4️⃣ Si todo está bien, proceder con la creación de la reserva
         vehiculo = Vehiculo.objects.create(
             id_usuario=request.user,
             placa=placa,
@@ -88,22 +118,6 @@ class CrearReservaView(APIView):
             color=color,
             tipo_vehiculo=tipo_vehiculo
         )
-
-        # Validar formato de hora (AM/PM)
-        try:
-            fecha_inicio = request.data.get("fecha_inicio")
-            fecha_fin = request.data.get("fecha_fin")
-
-            # ✅ Corrección 2: Ahora el usuario ingresa la hora en AM/PM
-            hora_inicio = datetime.strptime(request.data.get("hora_inicio"), "%I:%M %p").time()
-            hora_fin = datetime.strptime(request.data.get("hora_fin"), "%I:%M %p").time()
-        except ValueError:
-            return Response({"error": "Formato de hora incorrecto. Usa 'HH:MM AM/PM'."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Verificar disponibilidad en fecha y hora
-        reservas_existentes = Reserva.objects.filter(id_espacio=espacio, fecha_inicio=fecha_inicio, hora_inicio=hora_inicio)
-        if reservas_existentes.exists():
-            return Response({"error": "Este espacio ya está reservado para la fecha y hora seleccionadas."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Calcular monto total
         horas_reservadas = (datetime.combine(datetime.today(), hora_fin) - datetime.combine(datetime.today(), hora_inicio)).seconds / 3600
@@ -119,9 +133,9 @@ class CrearReservaView(APIView):
                 "color": vehiculo.color,
                 "tipo_vehiculo": vehiculo.tipo_vehiculo,
                 "fecha_inicio": fecha_inicio,
-                "hora_inicio": request.data.get("hora_inicio"),  # ✅ Se mantiene como ingresó el usuario
+                "hora_inicio": request.data.get("hora_inicio"),  
                 "fecha_fin": fecha_fin,
-                "hora_fin": request.data.get("hora_fin"),  # ✅ Se mantiene como ingresó el usuario
+                "hora_fin": request.data.get("hora_fin"),  
                 "monto_total": monto_total,
                 "confirmar": False
             }, status=status.HTTP_200_OK)
@@ -131,53 +145,34 @@ class CrearReservaView(APIView):
         data["cliente"] = request.user.id
         data["monto_total"] = monto_total
         data["vehiculo"] = vehiculo.id_vehiculo
-        data["id_parqueadero"] = id_parqueadero  # ✅ Se toma de la URL
-        data["id_espacio"] = id_espacio  # ✅ Se toma de la URL
-        data["hora_inicio"] = hora_inicio  # ✅ Se almacena correctamente
-        data["hora_fin"] = hora_fin  # ✅ Se almacena correctamente
+        data["id_parqueadero"] = id_parqueadero  
+        data["id_espacio"] = id_espacio  
+        data["hora_inicio"] = hora_inicio  
+        data["hora_fin"] = hora_fin  
 
         serializer = ReservaSerializer(data=data)
         if serializer.is_valid():
             reserva = serializer.save(estado="Confirmada")
 
-            # Marcar espacio como reservado
-            espacio.estado = "Reservado"
-            espacio.save()
-
-            # Generar código QR
+            # ✅ Asignamos correctamente el QR en texto
             reserva.codigo_qr_texto = f"Reserva {reserva.id_reserva}"
-            reserva.save(update_fields=["codigo_qr_texto"])
+            reserva.save(update_fields=["codigo_qr_texto"])  # ✅ Guardamos solo el código QR en la BD
+
+            # Generar código QR como imagen
             qr_image = generar_qr(f"Reserva {reserva.id_reserva}")
 
-            # Enviar correo de confirmación
-            email_html = render_to_string("correo_confirmacion.html", {
-                "id_reserva": reserva.id_reserva,
-                "monto_total": reserva.monto_total,
-                "fecha_inicio": reserva.fecha_inicio,
-                "hora_inicio": request.data.get("hora_inicio"),  # ✅ Se usa el valor ingresado por el usuario
-                "nombre_parqueadero": parqueadero.nombre,
-            })
-
-            email = EmailMessage(
-                "Confirmación de reserva",
-                email_html,
-                "parqueappreservas@gmail.com",
-                [request.user.email],
-            )
-            email.content_subtype = "html"
-            image_attachment = MIMEImage(qr_image)
-            image_attachment.add_header("Content-ID", "<qr_reserva>")
-            email.attach(image_attachment)
-            email.send()
+            # Marcar el espacio como reservado
+            espacio.estado = "Reservado"
+            espacio.save()
 
             return Response({
                 "mensaje": "Reserva creada exitosamente",
                 "id_reserva": str(reserva.id_reserva),
-                "estado": reserva.estado
+                "estado": reserva.estado,
+                "qr_code_base64": base64.b64encode(qr_image).decode("utf-8")  # ✅ Enviar QR como texto
             }, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 
 
