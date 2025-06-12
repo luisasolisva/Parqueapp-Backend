@@ -126,15 +126,14 @@ def lista_parqueaderos(request):
 
     return JsonResponse({'parqueaderos': data})
 
-from datetime import datetime
+
+
 from django.core.mail import send_mail
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
-from .permissions import IsAdminUser
-from usuarios.models import Parqueadero, EspacioParqueadero, Reserva
+from usuarios.models import Reserva, EspacioParqueadero, Parqueadero
 
 class ModificarEspaciosParqueaderoView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
@@ -151,13 +150,13 @@ class ModificarEspaciosParqueaderoView(APIView):
         if not espacios_modificados:
             return Response({"error": "Debes proporcionar al menos un espacio a modificar."}, status=status.HTTP_400_BAD_REQUEST)
 
-        estados_permitidos = ["Disponible", "Ocupado", "Deshabilitado"]
-        espacios_actuales = EspacioParqueadero.objects.filter(id_parqueadero=parqueadero)
+        estados_permitidos = ["Disponible", "Deshabilitado"]
+        espacios_actuales = EspacioParqueadero.objects.filter(mapa__parqueadero_id=parqueadero.id_parqueadero)
 
         reservas_canceladas = []
 
         for modificado in espacios_modificados:
-            espacio_db = espacios_actuales.filter(numero_espacio=modificado.get("espacio")).first()
+            espacio_db = espacios_actuales.filter(espacio=modificado.get("espacio")).first()  # ✅ Usa `espacio`, no `numero_espacio`
 
             if not espacio_db:
                 return Response({"error": f"El espacio '{modificado.get('espacio')}' no existe en el parqueadero."}, status=status.HTTP_400_BAD_REQUEST)
@@ -175,7 +174,7 @@ class ModificarEspaciosParqueaderoView(APIView):
                 # ✅ Notificar al cliente
                 send_mail(
                     "Cancelación de reserva - Modificación de espacio",
-                    f"Estimado usuario,\n\nTu reserva en el espacio {espacio_db.numero_espacio} ha sido cancelada porque el espacio ha sido modificado por el administrador.\n\nDisculpa las molestias.",
+                    f"Estimado usuario,\n\nTu reserva en el espacio {espacio_db.espacio} ha sido cancelada porque el espacio ha sido modificado por el administrador.\n\nDisculpa las molestias.",
                     "parqueappreservas@gmail.com",
                     [reserva_activa.cliente.email],
                     fail_silently=False,
@@ -184,26 +183,22 @@ class ModificarEspaciosParqueaderoView(APIView):
                 reservas_canceladas.append({
                     "id_reserva": str(reserva_activa.id_reserva),
                     "cliente": reserva_activa.cliente.email,
-                    "numero_espacio": espacio_db.numero_espacio
+                    "espacio": espacio_db.espacio
                 })
 
             # ✅ Modificar el estado del espacio
             if "estado" in modificado:
                 espacio_db.estado = modificado["estado"]
-            if "nuevo_numero_espacio" in modificado:
-                espacio_db.numero_espacio = modificado["nuevo_numero_espacio"]
+            if "nuevo_espacio" in modificado:
+                espacio_db.espacio = modificado["nuevo_espacio"]  # ✅ Corrige cambio de número
 
             espacio_db.save()
 
         return Response({
-            "message": "Espacios modificados correctamente.",
+            "mensaje": "Espacios modificados correctamente.",
             "reservas_canceladas": reservas_canceladas,
-            "espacios_modificados": list(espacios_actuales.values("numero_espacio", "estado"))
+            "espacios_modificados": list(espacios_actuales.values("espacio", "estado"))
         }, status=status.HTTP_200_OK)
-
-
-
-
 
 
 class VerEspaciosParqueaderoView(APIView):
