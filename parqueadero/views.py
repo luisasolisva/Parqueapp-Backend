@@ -10,13 +10,20 @@ from asgiref.sync import async_to_sync
 from .models import CambioMatriz
 
 def calcular_distancia(lat1, lon1, lat2, lon2):
-    # Fórmula Haversine
-    R = 6371  # km
-    dlat = radians(lat2 - lat1)
-    dlon = radians(lon2 - lon1)
-    a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
+    R = 6371  # Radio de la Tierra en km
+    lat1 = radians(lat1)
+    lon1 = radians(lon1)
+    lat2 = radians(lat2)
+    lon2 = radians(lon2)
+
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
     c = 2 * asin(sqrt(a))
-    return R * c
+    distancia = R * c
+    return distancia
+
 
 from django.db.models import Q
 
@@ -25,16 +32,16 @@ class ParqueaderosCercanosView(APIView):
 
     def post(self, request):
         lat = request.data.get("lat")
-        lng = request.data.get("lng")
+        long = request.data.get("long")
         busqueda = request.data.get("busqueda")  # Texto ingresado manualmente
 
-        if lat and lng:
+        if lat and long:
             parqueaderos = Parqueadero.objects.all()
             parqueaderos_dist = []
 
             for parqueadero in parqueaderos:
                 distancia = calcular_distancia(
-                    float(lat), float(lng),
+                    float(lat), float(long),
                     float(parqueadero.latitud), float(parqueadero.longitud)
                 )
                 parqueaderos_dist.append((distancia, parqueadero))
@@ -45,7 +52,7 @@ class ParqueaderosCercanosView(APIView):
             resultado = []
             for distancia, parqueadero in parqueaderos_cercanos:
                 data = ParqueaderoSerializer(parqueadero).data
-                data['distancia_km'] = round(distancia, 2)
+                data['distancia_km'] = round(distancia, 1)
                 resultado.append(data)
 
             return Response(resultado)

@@ -4,11 +4,29 @@ from rest_framework import serializers
 from usuarios.models import Parqueadero, MapaParqueadero, EspacioParqueadero
 
 
+from rest_framework import serializers
+from usuarios.models import Parqueadero, ImagenParqueadero
+
 class ParqueaderoSerializer(serializers.ModelSerializer):
+    imagenes = serializers.SerializerMethodField()
+
     class Meta:
         model = Parqueadero
-        fields = ['id_parqueadero', 'nombre', 'direccion', 'ciudad', 'latitud', 'longitud', 'precio_hora']
-        
+        fields = [
+            'id_parqueadero',
+            'nombre',
+            'direccion',
+            'precio_hora',
+            'imagenes'
+        ]
+
+    def get_imagenes(self, obj):
+        return [
+            str(imagen.imagen.url) 
+            for imagen in ImagenParqueadero.objects.filter(parqueadero=obj) 
+            if imagen.imagen
+        ]
+
 
 class EspacioParqueaderoSerializer(serializers.ModelSerializer):
     class Meta:
