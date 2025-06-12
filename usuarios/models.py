@@ -158,8 +158,16 @@ class Reserva(models.Model):
     fecha_fin = models.DateField()
     hora_fin = models.TimeField()
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
-    monto_total = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
+    monto_total = models.DecimalField(max_digits=10, decimal_places=3, default=0.00)
     codigo_qr_texto = models.TextField(blank=True, null=True)
+    numero_reserva = models.PositiveIntegerField(null=True, blank=True, unique=True)
+
+    def save(self, *args, **kwargs):
+        """Asigna automáticamente un número de reserva incremental si no tiene uno."""
+        if not self.numero_reserva:
+            self.numero_reserva = Reserva.objects.count() + 1  # ✅ Número secuencial basado en reservas existentes
+        super().save(*args, **kwargs)
+
 
     def __str__(self):
         return f'Reserva {self.id_reserva} de {self.cliente} - Vehículo {self.vehiculo.placa}'
