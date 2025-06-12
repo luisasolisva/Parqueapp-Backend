@@ -70,10 +70,15 @@ class CrearReservaView(APIView):
         if espacio.estado != "Disponible":
             return Response({"error": "El espacio seleccionado no está disponible."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # ✅ 2️⃣ Verificar si el usuario ya tiene una reserva activa
-        reserva_activa = Reserva.objects.filter(cliente=request.user, estado__in=["Pendiente", "Confirmada"]).exists()
-        if reserva_activa:
-            return Response({"error": "Ya tienes una reserva activa y no puedes crear otra."}, status=status.HTTP_400_BAD_REQUEST)
+    # ✅ 2️⃣ Verificar si el usuario ya tiene una reserva activa y excluir canceladas
+        reservas_activas = Reserva.objects.filter(cliente=request.user, estado__in=["Pendiente", "Confirmada"])
+
+        if reservas_activas.exists():
+            return Response({
+        "error": "Ya tienes una reserva activa y no puedes crear otra.",
+        "reservas_usuario": list(reservas_activas.values("id_reserva", "estado"))  # ✅ Ahora muestra las reservas activas del usuario
+    }, status=status.HTTP_400_BAD_REQUEST)
+
 
         # ✅ 3️⃣ Capturar todos los errores en un solo mensaje
         errores = {}
