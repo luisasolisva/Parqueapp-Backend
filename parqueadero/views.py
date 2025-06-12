@@ -636,16 +636,23 @@ class ParqueaderoDetailView(APIView):
 
 
 
+from cloudinary.uploader import destroy
+
 class EliminarParqueaderoView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]  # ✅ Solo admins autenticados pueden eliminar
+    permission_classes = [IsAuthenticated, IsAdminUser]
 
     def delete(self, request, id_parqueadero):
         parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
 
-        # ✅ Verificar que el usuario autenticado sea el propietario real
-        if parqueadero.propietario != request.user:  # 🔥 Comparar por ForeignKey, no por texto
+        if parqueadero.propietario != request.user:
             return Response({"error": "No puedes eliminar un parqueadero que no te pertenece."}, status=status.HTTP_403_FORBIDDEN)
 
+        # Eliminar imágenes de Cloudinary antes de eliminar los registros
+        for imagen in parqueadero.imagenes_del_parqueadero.all():
+            imagen.imagen.delete()  # ✅ Esto elimina el archivo en Cloudinary
+            imagen.delete()         # ✅ Esto elimina el registro en la base de datos
+
         parqueadero.delete()
+
         return Response({"message": "Parqueadero eliminado correctamente."}, status=status.HTTP_200_OK)
 
