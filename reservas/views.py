@@ -417,3 +417,90 @@ class ModificarReservaView(APIView):
             "nueva_fecha": reserva.fecha_inicio,
             "nueva_hora": reserva.hora_inicio
         }, status=status.HTTP_200_OK)
+
+
+
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from django.db.models import Q
+from usuarios.models import Parqueadero, MapaParqueadero, EspacioParqueadero, Reserva
+from datetime import datetime
+
+# ✅ Parser universal de horas
+def parse_hora(hora_str):
+    formatos = ["%H:%M", "%I:%M %p", "%H:%M:%S"]
+    for formato in formatos:
+        try:
+            return datetime.strptime(hora_str, formato).time()
+        except ValueError:
+            continue
+    raise ValueError("Formato de hora inválido")
+
+class MapaDisponibilidadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, id_parqueadero):
+        if request.user.tipo_usuario not in ["Cliente", "Operario"]:
+            return Response({"error": "No tienes permisos para consultar los espacios."}, status=status.HTTP_403_FORBIDDEN)
+
+
+        parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
+        mapa = get_object_or_404(MapaParqueadero, parqueadero=parqueadero)
+
+        # Obtener parámetros de consulta
+        fecha_inicio_str = request.query_params.get("fecha_inicio")
+        fecha_fin_str = request.query_params.get("fecha_fin")
+        hora_inicio_str = request.query_params.get("hora_inicio")
+        hora_fin_str = request.query_params.get("hora_fin")
+
+        if not all([fecha_inicio_str, fecha_fin_str, hora_inicio_str, hora_fin_str]):
+            return Response({"error": "Debes enviar fecha_inicio, fecha_fin, hora_inicio y hora_fin."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validación robusta de fechas y horas
+        try:
+            fecha_inicio = datetime.strptime(fecha_inicio_str, "%Y-%m-%d").date()
+            fecha_fin = datetime.strptime(fecha_fin_str, "%Y-%m-%d").date()
+            hora_inicio = parse_hora(hora_inicio_str)
+            hora_fin = parse_hora(hora_fin_str)
+        except ValueError:
+            return Response({"error": "Formato de fechas u horas inválido."}, status=status.HTTP_400_BAD_REQUEST)
+
+        espacios = EspacioParqueadero.objects.filter(mapa=mapa)
+
+        resultado = []
+        for espacio in espacios:
+            estado_actual = "disponible"
+
+            if espacio.estado == "Deshabilitado":
+                estado_actual = "deshabilitado"
+            else:
+                reservas_conflictivas = Reserva.objects.filter(
+                    id_espacio=espacio,
+                    estado__in=["Pendiente", "Confirmada"],
+                    fecha_inicio__lte=fecha_fin,
+                    fecha_fin__gte=fecha_inicio
+                ).filter(
+                    Q(hora_inicio__lt=hora_fin) & Q(hora_fin__gt=hora_inicio)
+                )
+
+                if reservas_conflictivas.exists():
+                    estado_actual = "ocupado"
+
+            resultado.append({
+                "id_espacio": str(espacio.id_espacio),   
+                "fila": espacio.fila,
+                "columna": espacio.columna,
+                "espacio": espacio.espacio,
+                "estado": estado_actual
+            })
+
+        return Response({
+            "mapaParqueadero": {
+                "mapaSize": {"filas": mapa.filas, "columnas": mapa.columnas},
+                "nomenclatura": mapa.nomenclatura,
+                "espacios": resultado
+            }
+        }, status=status.HTTP_200_OK)
