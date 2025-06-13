@@ -52,6 +52,7 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     codigo_restauracion = models.CharField(max_length=4, null=True, blank=True)  # Campo para el código de restauración
     codigo_creado = models.DateTimeField(null=True, blank=True)  # Fecha de creación del código
     codigo_validado = models.BooleanField(default=False) # Estado de validación del código
+    recordatorios_activos = models.BooleanField(default=True)  # ✅ Permite activar/desactivar recordatorios
 
     password = models.CharField(max_length=255)  # ¡Agrega este campo!
 
@@ -116,7 +117,28 @@ class EspacioParqueadero(models.Model):
 
     def __str__(self):
         return f'Espacio {self.espacio} en {self.mapa.parqueadero.nombre}'
+    
+    
+class Vehiculo(models.Model):
+    TIPO_VEHICULO_CHOICES = [
+        ('Carro', 'Carro'),
+        ('Moto', 'Moto'),
+        ('Bicicleta', 'Bicicleta'),
+    ]
 
+    id_vehiculo = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id_usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    placa = models.CharField(max_length=10)
+    marca = models.CharField(max_length=100)
+    modelo = models.CharField(max_length=100)
+    color = models.CharField(max_length=50)
+    tipo_vehiculo = models.CharField(max_length=20, choices=TIPO_VEHICULO_CHOICES)  # ✅ Nuevo campo
+
+    def __str__(self):
+        return f'{self.placa} - {self.tipo_vehiculo}'  
+    
+
+from django.utils.timezone import now
 
 class Reserva(models.Model):
     ESTADO_CHOICES = [
@@ -125,31 +147,44 @@ class Reserva(models.Model):
         ('Cancelada', 'Cancelada'),
         ('Finalizada', 'Finalizada'),
     ]
-    TIPO_VEHICULO_CHOICES = [
-        ('Carro', 'Carro'),
-        ('Moto', 'Moto'),
-        ('Bicicleta', 'Bicicleta'),
-    ]
 
     id_reserva = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     cliente = models.ForeignKey(Usuario, on_delete=models.CASCADE, db_column="cliente_id")
     id_parqueadero = models.ForeignKey(Parqueadero, on_delete=models.CASCADE, db_column="parqueadero_id")
     id_espacio = models.ForeignKey(EspacioParqueadero, on_delete=models.CASCADE, db_column="espacio_id")
+    vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE, db_column="vehiculo_id")
     fecha_inicio = models.DateField()
     hora_inicio = models.TimeField()
     fecha_fin = models.DateField()
     hora_fin = models.TimeField()
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
-    monto_total = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)  # ✅ Asegura un valor por defecto
-    placa = models.CharField(max_length=10)
-    color = models.CharField(max_length=20)
-    modelo = models.CharField(max_length=50)
-    tipo_vehiculo = models.CharField(max_length=20, choices=TIPO_VEHICULO_CHOICES)
-    codigo_qr_texto = models.TextField(blank=True, null=True)  # ✅ Nuevo campo para almacenar el QR en texto
+    monto_total = models.DecimalField(max_digits=10, decimal_places=3, default=0.00)
+    codigo_qr_texto = models.TextField(blank=True, null=True)
+    numero_reserva = models.PositiveIntegerField(null=True, blank=True, unique=True)
+
+    def save(self, *args, **kwargs):
+        """Asigna automáticamente un número de reserva incremental si no tiene uno."""
+        if not self.numero_reserva:
+            self.numero_reserva = Reserva.objects.count() + 1  # ✅ Número secuencial basado en reservas existentes
+        super().save(*args, **kwargs)
 
 
     def __str__(self):
-        return f'Reserva {self.id_reserva} de {self.cliente}'
+        return f'Reserva {self.id_reserva} de {self.cliente} - Vehículo {self.vehiculo.placa}'
+
+    def ha_finalizado(self):
+        """Verifica si la reserva ha finalizado comparando `hora_fin` con la hora actual."""
+        return now().time() > self.hora_fin
+
+    @property
+    def hora_inicio_am_pm(self):
+        """Transforma `hora_inicio` a formato AM/PM sin guardarlo en la BD."""
+        return self.hora_inicio.strftime("%I:%M %p")
+
+    @property
+    def hora_fin_am_pm(self):
+        """Transforma `hora_fin` a formato AM/PM sin guardarlo en la BD."""
+        return self.hora_fin.strftime("%I:%M %p")
 
 
 class Pago(models.Model):
@@ -188,16 +223,6 @@ class Reseña(models.Model):
         return f'Reseña de {self.id_usuario} para {self.id_parqueadero}'
 
 
-class Vehiculo(models.Model):
-    id_vehiculo = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    id_usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
-    placa = models.CharField(max_length=10)
-    marca = models.CharField(max_length=100)
-    modelo = models.CharField(max_length=100)
-    color = models.CharField(max_length=50)
-
-    def __str__(self):
-        return self.placa
 
 
 class Cancelacion(models.Model):

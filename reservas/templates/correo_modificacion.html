@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Modificación de Reserva</title>
+</head>
+<body style="font-family: Arial, sans-serif; padding: 20px; text-align: center;">
+    <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 1px 8px rgba(0, 0, 0, 0.1); max-width: 600px; margin: auto;">
+        <h1 style="color: #007bff;">¡Tu reserva ha sido modificada! 🔄</h1>
+        <p style="font-size: 16px; color: #333;">Estimado <b>{{ username }}</b>,</p>
+        <p style="font-size: 16px;">Has realizado cambios en tu reserva exitosamente.</p>
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px auto;">
+            <p><strong>ID de Reserva:</strong> {{ id_reserva }}</p>
+            <p><strong>Nuevo Espacio:</strong> {{ nuevo_espacio }}</p>
+            <p><strong>Nueva Fecha:</strong> {{ nueva_fecha }}</p>
+            <p><strong>Nueva Hora:</strong> {{ nueva_hora }}</p>
+        </div>
+        <p style="font-size: 16px;">Gracias por usar <b>ParqueApp</b>.</p>
+        <hr>
+        <p style="font-size: 12px; color: gray;">© 2025 ParqueApp. Todos los derechos reservados.</p>
+    </div>
+</body>
+</html>

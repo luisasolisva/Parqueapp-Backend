@@ -133,15 +133,14 @@ def lista_parqueaderos(request):
 
     return JsonResponse({'parqueaderos': data})
 
-from datetime import datetime
+
 from django.core.mail import send_mail
+from datetime import datetime
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
-from .permissions import IsAdminUser
-from usuarios.models import Parqueadero, EspacioParqueadero, Reserva
+from usuarios.models import Reserva, EspacioParqueadero, Parqueadero
 
 class ModificarEspaciosParqueaderoView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
@@ -149,65 +148,77 @@ class ModificarEspaciosParqueaderoView(APIView):
     def put(self, request, id_parqueadero):
         parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
 
-        # ✅ Validar permisos: solo administradores pueden modificar los espacios
         if request.user.tipo_usuario != "Admin":
             return Response({"error": "Solo administradores pueden modificar los espacios."}, status=status.HTTP_403_FORBIDDEN)
 
         espacios_modificados = request.data.get("espacios_disponibles", [])
+        fecha_inicio_admin = request.data.get("fecha_inicio")
+        hora_inicio_admin = request.data.get("hora_inicio")
+        fecha_fin_admin = request.data.get("fecha_fin")
+        hora_fin_admin = request.data.get("hora_fin")
 
-        if not espacios_modificados:
-            return Response({"error": "Debes proporcionar al menos un espacio a modificar."}, status=status.HTTP_400_BAD_REQUEST)
+        if not espacios_modificados or not fecha_inicio_admin or not hora_inicio_admin or not fecha_fin_admin or not hora_fin_admin:
+            return Response({"error": "Debes proporcionar los espacios y el rango de tiempo en el que deseas liberarlos."}, status=status.HTTP_400_BAD_REQUEST)
 
-        estados_permitidos = ["Disponible", "Ocupado", "Deshabilitado"]
-        espacios_actuales = EspacioParqueadero.objects.filter(id_parqueadero=parqueadero)
+        estados_permitidos = ["Disponible", "Deshabilitado"]
+        espacios_actuales = EspacioParqueadero.objects.filter(mapa__parqueadero_id=parqueadero.id_parqueadero)
 
         reservas_canceladas = []
 
         for modificado in espacios_modificados:
-            espacio_db = espacios_actuales.filter(numero_espacio=modificado.get("espacio")).first()
-
+            espacio_db = espacios_actuales.filter(espacio=modificado.get("espacio")).first()
             if not espacio_db:
                 return Response({"error": f"El espacio '{modificado.get('espacio')}' no existe en el parqueadero."}, status=status.HTTP_400_BAD_REQUEST)
 
             if "estado" in modificado and modificado["estado"] not in estados_permitidos:
                 return Response({"error": f"Estado '{modificado['estado']}' no es válido. Solo se permiten: {', '.join(estados_permitidos)}"}, status=status.HTTP_400_BAD_REQUEST)
 
-            # ✅ Verificar si el espacio tenía una reserva activa
-            reserva_activa = Reserva.objects.filter(id_espacio=espacio_db, estado="Pendiente").first()
-            if reserva_activa:
-                # ✅ Cambiar el estado de la reserva a Cancelada
-                reserva_activa.estado = "Cancelada"
-                reserva_activa.save()
+            # ✅ Convertir horario enviado por el admin a formato correcto
+            try:
+                hora_inicio_admin = datetime.strptime(hora_inicio_admin, "%I:%M %p").time()
+                hora_fin_admin = datetime.strptime(hora_fin_admin, "%I:%M %p").time()
+            except ValueError:
+                return Response({"error": "Formato de hora incorrecto. Usa 'HH:MM AM/PM'."}, status=status.HTTP_400_BAD_REQUEST)
 
-                # ✅ Notificar al cliente
-                send_mail(
-                    "Cancelación de reserva - Modificación de espacio",
-                    f"Estimado usuario,\n\nTu reserva en el espacio {espacio_db.numero_espacio} ha sido cancelada porque el espacio ha sido modificado por el administrador.\n\nDisculpa las molestias.",
-                    "parqueappreservas@gmail.com",
-                    [reserva_activa.cliente.email],
-                    fail_silently=False,
+            # ✅ Si el estado del espacio se cambia a "Disponible", cancelar reservas activas en el período seleccionado
+            if modificado["estado"] == "Disponible":
+                reservas_en_horario = Reserva.objects.filter(
+                    id_espacio=espacio_db,
+                    fecha_inicio__lte=fecha_inicio_admin,
+                    fecha_fin__gte=fecha_fin_admin,
+                    hora_inicio__lte=hora_inicio_admin,
+                    hora_fin__gte=hora_fin_admin,
+                    estado="Confirmada"
                 )
 
-                reservas_canceladas.append({
-                    "id_reserva": str(reserva_activa.id_reserva),
-                    "cliente": reserva_activa.cliente.email,
-                    "numero_espacio": espacio_db.numero_espacio
-                })
+                for reserva in reservas_en_horario:
+                    reserva.estado = "Cancelada"
+                    reserva.save()
+
+                    # ✅ Notificar al usuario afectado
+                    send_mail(
+                        "Modificación de espacio reservado",
+                        f"Estimado usuario,\n\nTu reserva en el espacio {espacio_db.espacio} ha sido cancelada porque el administrador modificó la disponibilidad.\n\nDisculpa las molestias.",
+                        "parqueappreservas@gmail.com",
+                        [reserva.cliente.email],
+                        fail_silently=False,
+                    )
+
+                    reservas_canceladas.append({
+                        "id_reserva": str(reserva.id_reserva),
+                        "cliente": reserva.cliente.email,
+                        "espacio": espacio_db.espacio
+                    })
 
             # ✅ Modificar el estado del espacio
-            if "estado" in modificado:
-                espacio_db.estado = modificado["estado"]
-            if "nuevo_numero_espacio" in modificado:
-                espacio_db.numero_espacio = modificado["nuevo_numero_espacio"]
-
+            espacio_db.estado = modificado["estado"]
             espacio_db.save()
 
         return Response({
-            "message": "Espacios modificados correctamente.",
-            "reservas_canceladas": reservas_canceladas,
-            "espacios_modificados": list(espacios_actuales.values("numero_espacio", "estado"))
+            "mensaje": "Espacios modificados correctamente.",
+            "reservas_afectadas": reservas_canceladas,
+            "espacios_modificados": list(espacios_actuales.values("espacio", "estado"))
         }, status=status.HTTP_200_OK)
-
 
 
 
