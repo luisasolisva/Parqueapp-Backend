@@ -419,7 +419,6 @@ class ModificarReservaView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -428,6 +427,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from usuarios.models import Parqueadero, MapaParqueadero, EspacioParqueadero, Reserva
 from datetime import datetime
+from django.utils import timezone
 
 # ✅ Parser universal de horas
 def parse_hora(hora_str):
@@ -443,30 +443,25 @@ class MapaDisponibilidadView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, id_parqueadero):
-        if request.user.tipo_usuario not in ["Cliente", "Operario"]:
+        ROLES_PERMITIDOS = ["Cliente", "Operario"]
+        if request.user.tipo_usuario not in ROLES_PERMITIDOS:
             return Response({"error": "No tienes permisos para consultar los espacios."}, status=status.HTTP_403_FORBIDDEN)
-
 
         parqueadero = get_object_or_404(Parqueadero, id_parqueadero=id_parqueadero)
         mapa = get_object_or_404(MapaParqueadero, parqueadero=parqueadero)
 
-        # Obtener parámetros de consulta
-        fecha_inicio_str = request.query_params.get("fecha_inicio")
-        fecha_fin_str = request.query_params.get("fecha_fin")
-        hora_inicio_str = request.query_params.get("hora_inicio")
-        hora_fin_str = request.query_params.get("hora_fin")
+        fecha_str = request.query_params.get("fecha")
+        hora_str = request.query_params.get("hora")
 
-        if not all([fecha_inicio_str, fecha_fin_str, hora_inicio_str, hora_fin_str]):
-            return Response({"error": "Debes enviar fecha_inicio, fecha_fin, hora_inicio y hora_fin."}, status=status.HTTP_400_BAD_REQUEST)
+        if not fecha_str or not hora_str:
+            return Response({"error": "Debes enviar fecha y hora."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Validación robusta de fechas y horas
         try:
-            fecha_inicio = datetime.strptime(fecha_inicio_str, "%Y-%m-%d").date()
-            fecha_fin = datetime.strptime(fecha_fin_str, "%Y-%m-%d").date()
-            hora_inicio = parse_hora(hora_inicio_str)
-            hora_fin = parse_hora(hora_fin_str)
+            fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+            hora = parse_hora(hora_str)
+            fecha_hora_consulta = timezone.make_aware(datetime.combine(fecha, hora))
         except ValueError:
-            return Response({"error": "Formato de fechas u horas inválido."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Formato de fecha u hora inválido."}, status=status.HTTP_400_BAD_REQUEST)
 
         espacios = EspacioParqueadero.objects.filter(mapa=mapa)
 
@@ -477,20 +472,27 @@ class MapaDisponibilidadView(APIView):
             if espacio.estado == "Deshabilitado":
                 estado_actual = "deshabilitado"
             else:
-                reservas_conflictivas = Reserva.objects.filter(
+                # Buscamos reservas activas de ese espacio para ese día
+                reservas = Reserva.objects.filter(
                     id_espacio=espacio,
                     estado__in=["Pendiente", "Confirmada"],
-                    fecha_inicio__lte=fecha_fin,
-                    fecha_fin__gte=fecha_inicio
-                ).filter(
-                    Q(hora_inicio__lt=hora_fin) & Q(hora_fin__gt=hora_inicio)
+                    fecha_inicio__lte=fecha,
+                    fecha_fin__gte=fecha
                 )
 
-                if reservas_conflictivas.exists():
+                conflicto = False
+                for reserva in reservas:
+                    inicio = timezone.make_aware(datetime.combine(reserva.fecha_inicio, reserva.hora_inicio))
+                    fin = timezone.make_aware(datetime.combine(reserva.fecha_fin, reserva.hora_fin))
+                    if inicio <= fecha_hora_consulta <= fin:
+                        conflicto = True
+                        break
+
+                if conflicto:
                     estado_actual = "ocupado"
 
             resultado.append({
-                "id_espacio": str(espacio.id_espacio),   
+                "id_espacio": str(espacio.id_espacio),
                 "fila": espacio.fila,
                 "columna": espacio.columna,
                 "espacio": espacio.espacio,
