@@ -107,16 +107,17 @@ class CrearReservaView(APIView):
         if not confirmar_reserva:
             return Response({
                 "mensaje": "Detalles de la reserva antes de confirmar.",
-                "placa": request.data.get("placa"),
-                "marca": request.data.get("marca"),
-                "modelo": request.data.get("modelo"),
-                "color": request.data.get("color"),
-                "tipo_vehiculo": request.data.get("tipo_vehiculo"),
+                # "placa": request.data.get("placa"),
+                # "marca": request.data.get("marca"),
+                # "modelo": request.data.get("modelo"),
+                # "color": request.data.get("color"),
+                # "tipo_vehiculo": request.data.get("tipo_vehiculo"),
                 "fecha_inicio": request.data.get("fecha_inicio"),
-                "hora_inicio": request.data.get("hora_inicio"),
                 "fecha_fin": request.data.get("fecha_fin"),
+                "hora_inicio": request.data.get("hora_inicio"),
                 "hora_fin": request.data.get("hora_fin"),
                 "parqueadero": parqueadero.nombre,
+                "direccion": parqueadero.direccion,
                 "espacio": espacio.espacio,
                 "monto_total": monto_total_calculado,
                 "confirmar": False
@@ -169,9 +170,9 @@ class CrearReservaView(APIView):
 
             return Response({
                 "mensaje": "Reserva creada exitosamente",
-                "numero_reserva": reserva.numero_reserva,
-                "estado": reserva.estado,
-                "monto_total": reserva.monto_total
+                # "numero_reserva": reserva.numero_reserva,
+                # "estado": reserva.estado,
+                # "monto_total": reserva.monto_total
             }, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
