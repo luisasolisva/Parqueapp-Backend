@@ -41,6 +41,8 @@ class ListaEspaciosDisponiblesView(APIView):
 from datetime import datetime
 import qrcode
 import base64
+from email.mime.image import MIMEImage
+from django.core.mail import EmailMultiAlternatives
 from io import BytesIO
 from django.template.loader import render_to_string
 from django.core.mail import EmailMessage
@@ -160,9 +162,30 @@ class CrearReservaView(APIView):
                 "monto_total": reserva.monto_total
             })
 
-            email = EmailMessage(subject, message_html, "parqueappreservas@gmail.com", [request.user.email])
-            email.content_subtype = "html"
-            email.attach("qr_code.png", qr_buffer.getvalue(), "image/png")
+            # email = EmailMessage(subject, message_html, "parqueappreservas@gmail.com", [request.user.email])
+            # email.content_subtype = "html"
+            # email.attach("qr_code.png", qr_buffer.getvalue(), "image/png")
+            # email.send(fail_silently=False)
+
+            # Crea el mensaje base
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body='',
+                from_email="parqueappreservas@gmail.com",
+                to=[request.user.email]
+            )
+            email.attach_alternative(message_html, "text/html")
+
+            # Prepara la imagen QR como parte embebida
+            qr_image = MIMEImage(qr_buffer.getvalue(), _subtype="png")
+            qr_image.add_header("Content-ID", "<qr_code>")
+            qr_image.add_header("Content-Disposition", "inline", filename="qr_code.png")
+
+            # Adjunta como parte "relacionada"
+            email.mixed_subtype = 'related'
+            email.attach(qr_image)
+
+            # Envía
             email.send(fail_silently=False)
 
             espacio.estado = "Reservado"
