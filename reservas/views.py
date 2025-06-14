@@ -54,6 +54,8 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 from usuarios.models import Reserva, EspacioParqueadero, Parqueadero, Vehiculo
 from .serializers import ReservaSerializer
+from usuarios.models import Parqueadero, MapaParqueadero, EspacioParqueadero, Reserva, ImagenParqueadero
+
 
 def generar_qr(texto):
     """Genera un código QR en formato de imagen."""
@@ -105,6 +107,11 @@ class CrearReservaView(APIView):
         duracion_horas = (fecha_hora_fin - fecha_hora_inicio).total_seconds() / 3600
         monto_total_calculado = round(duracion_horas * float(parqueadero.precio_hora), 2)
 
+        imagenes = [
+            request.build_absolute_uri(imagen.imagen.url) 
+            for imagen in ImagenParqueadero.objects.filter(parqueadero=parqueadero) 
+            if imagen.imagen
+        ]
         # ✅ Si `confirmar` es `False`, enviamos los detalles completos antes de crear la reserva.
         if not confirmar_reserva:
             return Response({
@@ -120,6 +127,7 @@ class CrearReservaView(APIView):
                 "hora_fin": request.data.get("hora_fin"),
                 "parqueadero": parqueadero.nombre,
                 "direccion": parqueadero.direccion,
+                "imagen": imagenes,
                 "espacio": espacio.espacio,
                 "monto_total": monto_total_calculado,
                 "confirmar": False
