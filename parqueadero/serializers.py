@@ -16,6 +16,7 @@ class ParqueaderoSerializer(serializers.ModelSerializer):
             'id_parqueadero',
             'nombre',
             'direccion',
+            'ciudad',
             'precio_hora',
             'imagenes'
         ]
