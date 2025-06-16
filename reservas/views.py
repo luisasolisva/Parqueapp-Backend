@@ -566,7 +566,7 @@ class ReservasClienteView(APIView):
                 "direccion": parqueadero.direccion,
                 "imagen": imagenes,  # Lista de URLs absolutas
                 "fecha_reserva": reserva.fecha_inicio.strftime("%Y-%m-%d"),
-                "estado": "Activa" if reserva.estado == "Confirmada" else "Inactiva"
+                "estado": "Activa" if reserva.estado == "Confirmada" else "Pasada"
             })
 
         return Response(resultado, status=status.HTTP_200_OK)
