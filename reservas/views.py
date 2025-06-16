@@ -532,3 +532,41 @@ class MapaDisponibilidadView(APIView):
                 "espacios": resultado
             }
         }, status=status.HTTP_200_OK)
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from usuarios.models import Reserva, Parqueadero, ImagenParqueadero
+from django.shortcuts import get_object_or_404
+
+class ReservasClienteView(APIView):
+    def get(self, request, id_cliente):
+        reservas = Reserva.objects.filter(
+            cliente__id=id_cliente,
+            estado__in=["Confirmada", "Finalizada"]
+        ).select_related("id_parqueadero")
+
+        resultado = []
+
+        for reserva in reservas:
+            parqueadero = reserva.id_parqueadero
+
+            # Obtener todas las URLs absolutas de las imágenes asociadas al parqueadero
+            imagenes = [
+                request.build_absolute_uri(imagen.imagen.url)
+                for imagen in ImagenParqueadero.objects.filter(parqueadero=parqueadero)
+                if imagen.imagen
+            ]
+
+            resultado.append({
+                "id_reserva": str(reserva.id_reserva),
+                #"id_parqueadero": str(parqueadero.id_parqueadero),
+                "nombre_parqueadero": parqueadero.nombre,
+                "direccion": parqueadero.direccion,
+                "imagen": imagenes,  # Lista de URLs absolutas
+                "fecha_reserva": reserva.fecha_inicio.strftime("%Y-%m-%d"),
+                "estado": "Activa" if reserva.estado == "Confirmada" else "Inactiva"
+            })
+
+        return Response(resultado, status=status.HTTP_200_OK)
