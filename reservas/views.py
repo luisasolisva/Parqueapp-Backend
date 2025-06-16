@@ -77,23 +77,16 @@ class CrearReservaView(APIView):
         if espacio.estado != "Disponible":
             return Response({"error": "El espacio seleccionado no está disponible."}, status=status.HTTP_400_BAD_REQUEST)
 
-        reservas_activas = Reserva.objects.filter(cliente=request.user, estado__in=["Pendiente", "Confirmada"])
-        if reservas_activas.exists():
-            return Response({
-                "error": "Ya tienes una reserva activa y no puedes crear otra.",
-                "reservas_usuario": list(reservas_activas.values("id_reserva", "estado"))
-            }, status=status.HTTP_400_BAD_REQUEST)
-
+        # ✅ Validación de campos requeridos
         errores = {}
         datos_requeridos = ["placa", "marca", "modelo", "color", "tipo_vehiculo", "fecha_inicio", "fecha_fin", "hora_inicio", "hora_fin"]
-
         for campo in datos_requeridos:
             if not request.data.get(campo):
                 errores[campo] = f"El campo '{campo}' es obligatorio."
-
         if errores:
             return Response({"error": "Faltan datos obligatorios en la reserva.", "detalles": errores}, status=status.HTTP_400_BAD_REQUEST)
 
+        # ✅ Parseo de horas
         try:
             hora_inicio = datetime.strptime(request.data.get("hora_inicio"), "%I:%M %p").time()
             hora_fin = datetime.strptime(request.data.get("hora_fin"), "%I:%M %p").time()
@@ -102,25 +95,45 @@ class CrearReservaView(APIView):
 
         confirmar_reserva = request.data.get("confirmar", False)
 
-        fecha_hora_inicio = datetime.combine(datetime.strptime(request.data.get("fecha_inicio"), "%Y-%m-%d"), hora_inicio)
-        fecha_hora_fin = datetime.combine(datetime.strptime(request.data.get("fecha_fin"), "%Y-%m-%d"), hora_fin)
+        fecha_inicio = datetime.strptime(request.data.get("fecha_inicio"), "%Y-%m-%d")
+        fecha_fin = datetime.strptime(request.data.get("fecha_fin"), "%Y-%m-%d")
+
+        fecha_hora_inicio = datetime.combine(fecha_inicio, hora_inicio)
+        fecha_hora_fin = datetime.combine(fecha_fin, hora_fin)
+
+        # ✅ Validación de reservas cruzadas
+        reservas_cruzadas = Reserva.objects.filter(
+            cliente=request.user,
+            estado__in=["Pendiente", "Confirmada"],
+            fecha_inicio__lte=fecha_fin,
+            fecha_fin__gte=fecha_inicio
+        ).exclude(
+            hora_inicio__gte=hora_fin
+        ).exclude(
+            hora_fin__lte=hora_inicio
+        )
+
+        if reservas_cruzadas.exists():
+            return Response({
+                "error": "Ya tienes una reserva que se cruza en horario con la que estás intentando hacer.",
+                "reservas_cruzadas": list(reservas_cruzadas.values(
+                    "id_reserva", "fecha_inicio", "fecha_fin", "hora_inicio", "hora_fin", "id_parqueadero__nombre"
+                ))
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # ✅ Cálculo de monto
         duracion_horas = (fecha_hora_fin - fecha_hora_inicio).total_seconds() / 3600
         monto_total_calculado = round(duracion_horas * float(parqueadero.precio_hora), 2)
 
         imagenes = [
-            request.build_absolute_uri(imagen.imagen.url) 
-            for imagen in ImagenParqueadero.objects.filter(parqueadero=parqueadero) 
+            request.build_absolute_uri(imagen.imagen.url)
+            for imagen in ImagenParqueadero.objects.filter(parqueadero=parqueadero)
             if imagen.imagen
         ]
-        # ✅ Si `confirmar` es `False`, enviamos los detalles completos antes de crear la reserva.
+
         if not confirmar_reserva:
             return Response({
                 "mensaje": "Detalles de la reserva antes de confirmar.",
-                # "placa": request.data.get("placa"),
-                # "marca": request.data.get("marca"),
-                # "modelo": request.data.get("modelo"),
-                # "color": request.data.get("color"),
-                # "tipo_vehiculo": request.data.get("tipo_vehiculo"),
                 "fecha_inicio": request.data.get("fecha_inicio"),
                 "fecha_fin": request.data.get("fecha_fin"),
                 "hora_inicio": request.data.get("hora_inicio"),
@@ -133,7 +146,7 @@ class CrearReservaView(APIView):
                 "confirmar": False
             }, status=status.HTTP_200_OK)
 
-        # ✅ Si `confirmar` es `True`, creamos la reserva y enviamos el correo
+        # ✅ Crear vehículo
         vehiculo = Vehiculo.objects.create(
             id_usuario=request.user,
             placa=request.data.get("placa"),
@@ -147,20 +160,20 @@ class CrearReservaView(APIView):
         data["cliente"] = request.user.id
         data["monto_total"] = monto_total_calculado
         data["vehiculo"] = vehiculo.id_vehiculo
-        data["id_parqueadero"] = id_parqueadero  
-        data["id_espacio"] = id_espacio  
-        data["hora_inicio"] = hora_inicio  
-        data["hora_fin"] = hora_fin  
+        data["id_parqueadero"] = id_parqueadero
+        data["id_espacio"] = id_espacio
+        data["hora_inicio"] = hora_inicio
+        data["hora_fin"] = hora_fin
 
         serializer = ReservaSerializer(data=data)
         if serializer.is_valid():
             reserva = serializer.save(estado="Confirmada")
             reserva.monto_total = monto_total_calculado
-            reserva.save(update_fields=["monto_total"])  
+            reserva.save(update_fields=["monto_total"])
 
+            # Envío de QR
             qr_image = generar_qr(f"Reserva {reserva.id_reserva}")
             qr_buffer = BytesIO(qr_image)
-
             subject = "Confirmación de Reserva - ParqueApp"
             message_html = render_to_string("reserva_confirmada.html", {
                 "usuario": request.user,
@@ -170,12 +183,6 @@ class CrearReservaView(APIView):
                 "monto_total": reserva.monto_total
             })
 
-            # email = EmailMessage(subject, message_html, "parqueappreservas@gmail.com", [request.user.email])
-            # email.content_subtype = "html"
-            # email.attach("qr_code.png", qr_buffer.getvalue(), "image/png")
-            # email.send(fail_silently=False)
-
-            # Crea el mensaje base
             email = EmailMultiAlternatives(
                 subject=subject,
                 body='',
@@ -183,34 +190,21 @@ class CrearReservaView(APIView):
                 to=[request.user.email]
             )
             email.attach_alternative(message_html, "text/html")
-
-            # Prepara la imagen QR como parte embebida
             qr_image = MIMEImage(qr_buffer.getvalue(), _subtype="png")
             qr_image.add_header("Content-ID", "<qr_code>")
             qr_image.add_header("Content-Disposition", "inline", filename="qr_code.png")
-
-            # Adjunta como parte "relacionada"
             email.mixed_subtype = 'related'
             email.attach(qr_image)
-
-            # Envía
             email.send(fail_silently=False)
 
             espacio.estado = "Reservado"
             espacio.save()
 
             return Response({
-                "mensaje": "Reserva creada exitosamente",
-                # "numero_reserva": reserva.numero_reserva,
-                # "estado": reserva.estado,
-                # "monto_total": reserva.monto_total
+                "mensaje": "Reserva creada exitosamente"
             }, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-
-
 
 
 from django.template.loader import render_to_string
