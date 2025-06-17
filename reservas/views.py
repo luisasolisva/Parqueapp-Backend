@@ -45,24 +45,23 @@ from email.mime.image import MIMEImage
 from django.core.mail import EmailMultiAlternatives
 from io import BytesIO
 from django.template.loader import render_to_string
-from django.core.mail import EmailMessage
 from django.utils.html import strip_tags
 from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
-from usuarios.models import Reserva, EspacioParqueadero, Parqueadero, Vehiculo
+from rest_framework.permissions import IsAuthenticated
+from usuarios.models import Reserva, EspacioParqueadero, Parqueadero, Vehiculo, ImagenParqueadero
 from .serializers import ReservaSerializer
-from usuarios.models import Parqueadero, MapaParqueadero, EspacioParqueadero, Reserva, ImagenParqueadero
 
 
-def generar_qr(texto):
-    """Genera un código QR en formato de imagen."""
-    qr = qrcode.make(texto)
+def generar_qr(url):
+    qr = qrcode.make(url)
     buffer = BytesIO()
     qr.save(buffer, format="PNG")
     return buffer.getvalue()
+
 
 class CrearReservaView(APIView):
     permission_classes = [IsAuthenticated]
@@ -77,7 +76,6 @@ class CrearReservaView(APIView):
         if espacio.estado != "Disponible":
             return Response({"error": "El espacio seleccionado no está disponible."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # ✅ Validación de campos requeridos
         errores = {}
         datos_requeridos = ["placa", "marca", "modelo", "color", "tipo_vehiculo", "fecha_inicio", "fecha_fin", "hora_inicio", "hora_fin"]
         for campo in datos_requeridos:
@@ -86,7 +84,6 @@ class CrearReservaView(APIView):
         if errores:
             return Response({"error": "Faltan datos obligatorios en la reserva.", "detalles": errores}, status=status.HTTP_400_BAD_REQUEST)
 
-        # ✅ Parseo de horas
         try:
             hora_inicio = datetime.strptime(request.data.get("hora_inicio"), "%I:%M %p").time()
             hora_fin = datetime.strptime(request.data.get("hora_fin"), "%I:%M %p").time()
@@ -101,7 +98,6 @@ class CrearReservaView(APIView):
         fecha_hora_inicio = datetime.combine(fecha_inicio, hora_inicio)
         fecha_hora_fin = datetime.combine(fecha_fin, hora_fin)
 
-        # ✅ Validación de reservas cruzadas
         reservas_cruzadas = Reserva.objects.filter(
             cliente=request.user,
             estado__in=["Pendiente", "Confirmada"],
@@ -121,7 +117,6 @@ class CrearReservaView(APIView):
                 ))
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # ✅ Cálculo de monto
         duracion_horas = (fecha_hora_fin - fecha_hora_inicio).total_seconds() / 3600
         monto_total_calculado = round(duracion_horas * float(parqueadero.precio_hora), 2)
 
@@ -141,12 +136,11 @@ class CrearReservaView(APIView):
                 "parqueadero": parqueadero.nombre,
                 "direccion": parqueadero.direccion,
                 "imagen": imagenes,
-                "espacio": espacio.espacio,
+                "plaza": espacio.espacio,
                 "monto_total": monto_total_calculado,
                 "confirmar": False
             }, status=status.HTTP_200_OK)
 
-        # ✅ Crear vehículo
         vehiculo = Vehiculo.objects.create(
             id_usuario=request.user,
             placa=request.data.get("placa"),
@@ -171,9 +165,10 @@ class CrearReservaView(APIView):
             reserva.monto_total = monto_total_calculado
             reserva.save(update_fields=["monto_total"])
 
-            # Envío de QR
-            qr_image = generar_qr(f"Reserva {reserva.id_reserva}")
+            url_qr = f"http://127.0.0.1:8000/api/reservas/validar-qr/{reserva.token_qr}/"
+            qr_image = generar_qr(url_qr)
             qr_buffer = BytesIO(qr_image)
+
             subject = "Confirmación de Reserva - ParqueApp"
             message_html = render_to_string("reserva_confirmada.html", {
                 "usuario": request.user,
@@ -200,9 +195,7 @@ class CrearReservaView(APIView):
             espacio.estado = "Reservado"
             espacio.save()
 
-            return Response({
-                "mensaje": "Reserva creada exitosamente"
-            }, status=status.HTTP_201_CREATED)
+            return Response({"mensaje": "Reserva creada exitosamente"}, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -587,3 +580,51 @@ class ReservasClienteView(APIView):
             })
 
         return Response(resultado, status=status.HTTP_200_OK)
+    
+
+# views.py
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from usuarios.models import Reserva
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+
+class ValidarQRView(APIView):
+    def get(self, request, token_qr):
+        reserva = get_object_or_404(Reserva, token_qr=token_qr)
+
+        if not reserva.qr_usado_entrada:
+            reserva.qr_usado_entrada = True
+            reserva.estado = "En Curso"
+            reserva.save(update_fields=["qr_usado_entrada", "estado"])
+            return Response({
+                "mensaje": "QR validado para entrada. La reserva está en curso.",
+                "redirigir_a": "https://tusitio.com/frontend/reserva/entrada"  # cambia esta URL
+            }, status=status.HTTP_200_OK)
+
+        elif not reserva.qr_usado_salida:
+            reserva.qr_usado_salida = True
+            reserva.estado = "Finalizada"
+            reserva.save(update_fields=["qr_usado_salida", "estado"])
+            return Response({
+                "mensaje": "QR validado para salida. La reserva ha finalizado.",
+                "redirigir_a": "https://tusitio.com/frontend/reserva/salida"  # cambia esta URL
+            }, status=status.HTTP_200_OK)
+
+        else:
+            return Response({
+                "mensaje": "Este QR ya fue utilizado para entrada y salida.",
+                "estado": reserva.estado
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class QRReservaView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, id_reserva):
+        reserva = get_object_or_404(Reserva, id_reserva=id_reserva, cliente=request.user)
+        url_qr = f"https://tusitio.com/api/reservas/validar-qr/{reserva.token_qr}/"
+        return Response({
+            "url_qr": url_qr
+        })

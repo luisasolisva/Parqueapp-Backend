@@ -144,6 +144,7 @@ class Reserva(models.Model):
     ESTADO_CHOICES = [
         ('Pendiente', 'Pendiente'),
         ('Confirmada', 'Confirmada'),
+        ('En Curso', 'En Curso'),
         ('Cancelada', 'Cancelada'),
         ('Finalizada', 'Finalizada'),
     ]
@@ -159,8 +160,13 @@ class Reserva(models.Model):
     hora_fin = models.TimeField()
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES)
     monto_total = models.DecimalField(max_digits=10, decimal_places=3, default=0.00)
-    codigo_qr_texto = models.TextField(blank=True, null=True)
     numero_reserva = models.PositiveIntegerField(null=True, blank=True, unique=True)
+
+    token_qr = models.CharField(max_length=64, unique=True, default=uuid.uuid4)
+    qr_usado_entrada = models.BooleanField(default=False)
+    qr_usado_salida = models.BooleanField(default=False)
+
+
 
     def save(self, *args, **kwargs):
         """Asigna automáticamente un número de reserva incremental si no tiene uno."""
