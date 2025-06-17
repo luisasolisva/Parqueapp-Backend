@@ -282,19 +282,36 @@ class CancelarReservaView(APIView):
 
 
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from usuarios.models import Reserva, ImagenParqueadero
+
 class DetalleReservaView(APIView):
-    permission_classes = [IsAuthenticated]
+    def get(self, request, id_reserva):
+        reserva = get_object_or_404(Reserva, id_reserva=id_reserva)
+        parqueadero = reserva.id_parqueadero
 
-    def get(self, request, id_reserva) :   # Obtener la reserva del usuario autenticado
-        reserva = get_object_or_404(Reserva, id_reserva=id_reserva, cliente=request.user)
+        imagenes = [
+            request.build_absolute_uri(imagen.imagen.url)
+            for imagen in ImagenParqueadero.objects.filter(parqueadero=parqueadero)
+            if imagen.imagen
+        ]
 
-        # Serializar los datos
-        serializer = ReservaSerializer(reserva)
+        datos = {
+            "fecha_inicio": reserva.fecha_inicio.strftime("%Y-%m-%d"),
+            "fecha_fin": reserva.fecha_fin.strftime("%Y-%m-%d"),
+            "hora_inicio": reserva.hora_inicio.strftime("%I:%M %p"),
+            "hora_fin": reserva.hora_fin.strftime("%I:%M %p"),
+            "plaza": reserva.id_espacio.espacio,
+            "monto_total": float(reserva.monto_total),
+            "parqueadero": parqueadero.nombre,
+            "direccion": parqueadero.direccion,
+            "imagen": imagenes
+        }
 
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-
+        return Response(datos, status=status.HTTP_200_OK)
 
 
 from rest_framework.permissions import IsAuthenticated
