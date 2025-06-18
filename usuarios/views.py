@@ -296,6 +296,7 @@ from .serializers import OperarioRegisterSerializer
 class RegisterOperarioView(GenericAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = OperarioRegisterSerializer
+    queryset = Usuario.objects.none()  # <- Soluciona el error
 
     def post(self, request):
         serializer = self.get_serializer(data=request.data, context={'request': request})

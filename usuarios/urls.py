@@ -2,17 +2,18 @@ from django.urls import path
 from .views import UserRetrieveView, UserUpdateView
 from .views import RegisterView, VistaActivacionCuenta
 from .views import LoginView, ClienteStatusView, ClienteUpdateView
-from .views import SendResetCodeView, VerifyResetCodeView, ResetPasswordView, UserDeleteView
+from .views import SendResetCodeView, VerifyResetCodeView, ResetPasswordView, UserDeleteView, RegisterOperarioView
 
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
-    TokenVerifyView 
+    TokenVerifyView,
 )
 
 urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
     path('register/', RegisterView.as_view(), name='registro'),
+    path('registrar-operario/', RegisterOperarioView.as_view(), name='registrar-operario'),
     path('activar-cuenta/<uidb64>/<token>/', VistaActivacionCuenta.as_view(), name='activar_cuenta'),
     path('obtener-token/', TokenObtainPairView.as_view(), name='obtener_token'),
     path('verificar-token/', TokenVerifyView .as_view(), name='verificar_token'),

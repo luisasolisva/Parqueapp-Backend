@@ -222,7 +222,7 @@ class OperarioRegisterSerializer(serializers.ModelSerializer):
         request = self.context['request']
         creador = request.user
 
-        if creador.tipo_usuario != 'Administrador':
+        if creador.tipo_usuario != 'Admin':
             raise serializers.ValidationError("Solo los administradores pueden registrar operarios.")
 
         # Obtener el parqueadero del administrador
