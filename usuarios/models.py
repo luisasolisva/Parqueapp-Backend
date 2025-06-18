@@ -104,9 +104,11 @@ class MapaParqueadero(models.Model):
 
 class EspacioParqueadero(models.Model):
     ESTADO_CHOICES = [
-        ('Disponible', 'Disponible'),
-        ('Deshabilitado', 'Deshabilitado'),
-    ]
+    ("Disponible", "Disponible"),
+    ("Ocupado", "Ocupado"),
+    ("Deshabilitado", "Deshabilitado"),
+]
+
 
     id_espacio = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     mapa = models.ForeignKey(MapaParqueadero, on_delete=models.CASCADE, related_name='espacios')

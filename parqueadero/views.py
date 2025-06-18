@@ -674,3 +674,35 @@ class EliminarParqueaderoView(APIView):
 
         return Response({"message": "Parqueadero eliminado correctamente."}, status=status.HTTP_200_OK)
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from usuarios.models import EspacioParqueadero  # ajusta si está en otro lugar
+
+class CambiarEstadoEspacioOperarioView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, id_espacio):
+        if request.user.tipo_usuario != "Operario":
+            return Response({"error": "Solo los operarios pueden cambiar el estado del espacio."}, status=status.HTTP_403_FORBIDDEN)
+
+        nuevo_estado = request.data.get("estado")
+
+        if nuevo_estado not in ["Ocupado", "Disponible"]:
+            return Response({"error": "El estado debe ser 'Ocupado' o 'Disponible'."}, status=status.HTTP_400_BAD_REQUEST)
+
+        espacio = get_object_or_404(EspacioParqueadero, id_espacio=id_espacio)
+
+        if espacio.estado == "Deshabilitado":
+            return Response({"error": "No se puede modificar un espacio deshabilitado."}, status=status.HTTP_400_BAD_REQUEST)
+
+        espacio.estado = nuevo_estado
+        espacio.save(update_fields=["estado"])
+
+        return Response({
+            "mensaje": f"Espacio actualizado correctamente a '{nuevo_estado}'.",
+            "id_espacio": str(espacio.id_espacio),
+            "estado": espacio.estado
+        }, status=status.HTTP_200_OK)

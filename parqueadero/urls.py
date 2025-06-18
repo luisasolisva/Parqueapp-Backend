@@ -2,7 +2,7 @@ from django.urls import path
 from .views import ParqueaderosCercanosView
 from .views import RegistrarParqueaderoView, lista_parqueaderos
 from .views import ModificarParqueaderoView, VerEspaciosParqueaderoView,EliminarParqueaderoView
-from .views import ModificarMapaParqueaderoView, CambiarEstadoEspaciosView, ObtenerMapaParqueaderoView, CrearMapaParqueaderoView, ModificarEspaciosParqueaderoView, EstadisticasAdminView, ParqueaderoDetailView
+from .views import ModificarMapaParqueaderoView, CambiarEstadoEspaciosView, ObtenerMapaParqueaderoView, CrearMapaParqueaderoView, ModificarEspaciosParqueaderoView, EstadisticasAdminView, ParqueaderoDetailView, CambiarEstadoEspacioOperarioView
 from . import views
 
 
@@ -20,5 +20,6 @@ urlpatterns = [
     path('eliminar-parqueadero/<uuid:id_parqueadero>/', EliminarParqueaderoView.as_view(), name='Eliminar_parqueadero'),
     path('modificar-espacios/<uuid:id_parqueadero>/', ModificarEspaciosParqueaderoView.as_view(), name="modificar_espacios_parqueadero"),
     path('espaciosadmin/<uuid:id_parqueadero>/', VerEspaciosParqueaderoView.as_view(), name="espacios_admin"),
+    path("cambiar-estado-espacio-operario/<uuid:id_espacio>/", CambiarEstadoEspacioOperarioView.as_view())
 
 ]
