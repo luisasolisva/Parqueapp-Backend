@@ -630,6 +630,19 @@ class QRReservaView(APIView):
         })
 
 
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from datetime import datetime
+import pytz
+
+from usuarios.models import Parqueadero, MapaParqueadero, EspacioParqueadero, Reserva, Usuario
+
+# ... (importaciones y clase sin cambios hasta aquí)
+
 class MapaDisponibilidadOperarioView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -638,7 +651,7 @@ class MapaDisponibilidadOperarioView(APIView):
             return Response({"error": "Solo los operarios pueden consultar este recurso."}, status=status.HTTP_403_FORBIDDEN)
 
         operario = request.user
-        parqueadero = getattr(operario, "parqueadero", None)
+        parqueadero = operario.parqueadero_asignado
 
         if not parqueadero:
             return Response({"error": "El operario no tiene un parqueadero asignado."}, status=status.HTTP_400_BAD_REQUEST)
@@ -654,10 +667,17 @@ class MapaDisponibilidadOperarioView(APIView):
         espacios = EspacioParqueadero.objects.filter(mapa=mapa)
         resultado = []
 
+        # 👉 Inicializamos contadores
+        disponibles = 0
+        ocupados = 0
+        deshabilitados = 0
+
         for espacio in espacios:
             estado_actual = "disponible"
+
             if espacio.estado == "Deshabilitado":
                 estado_actual = "deshabilitado"
+                deshabilitados += 1
             else:
                 reservas = Reserva.objects.filter(
                     id_espacio=espacio,
@@ -671,8 +691,12 @@ class MapaDisponibilidadOperarioView(APIView):
                     timezone.make_aware(datetime.combine(r.fecha_fin, r.hora_fin))
                     for r in reservas
                 )
+
                 if conflicto:
                     estado_actual = "ocupado"
+                    ocupados += 1
+                else:
+                    disponibles += 1
 
             resultado.append({
                 "id_espacio": str(espacio.id_espacio),
@@ -689,6 +713,10 @@ class MapaDisponibilidadOperarioView(APIView):
                 "espacios": resultado
             },
             "fecha_actual": fecha.isoformat(),
-            "hora_actual": hora.strftime("%H:%M")
+            "hora_actual": hora.strftime("%H:%M"),
+            "estadisticas": {
+                "disponibles": disponibles,
+                "ocupados": ocupados,
+                "deshabilitados": deshabilitados
+            }
         }, status=status.HTTP_200_OK)
-
