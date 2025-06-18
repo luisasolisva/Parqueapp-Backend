@@ -165,7 +165,7 @@ class CrearReservaView(APIView):
             reserva.monto_total = monto_total_calculado
             reserva.save(update_fields=["monto_total"])
 
-            url_qr = f"http://127.0.0.1:8000/api/reservas/validar-qr/{reserva.token_qr}/"
+            url_qr = f"/reservas/validar-qr/{reserva.token_qr}/"
             qr_image = generar_qr(url_qr)
             qr_buffer = BytesIO(qr_image)
 
@@ -192,8 +192,8 @@ class CrearReservaView(APIView):
             email.attach(qr_image)
             email.send(fail_silently=False)
 
-            espacio.estado = "Reservado"
-            espacio.save()
+            # espacio.estado = "Reservado"
+            # espacio.save()
 
             return Response({"mensaje": "Reserva creada exitosamente"}, status=status.HTTP_201_CREATED)
 
@@ -605,8 +605,7 @@ class ValidarQRView(APIView):
             reserva.save(update_fields=["qr_usado_entrada", "estado"])
             return Response({
                 "mensaje": "QR validado para entrada. La reserva está en curso.",
-                "redirigir_a": "http://localhost:5173/scan-qr?entrada=true"  # cambia esta URL
-                # "redirigir_a": "https://parqueapp.eleueleo.com/scan-qr?entrada=true"  # cambia esta URL Producción
+                "redirigir_a": "/scan-qr?entrada=true"  # cambia esta URL
             }, status=status.HTTP_200_OK)
 
         elif not reserva.qr_usado_salida:
@@ -615,8 +614,7 @@ class ValidarQRView(APIView):
             reserva.save(update_fields=["qr_usado_salida", "estado"])
             return Response({
                 "mensaje": "QR validado para salida. La reserva ha finalizado.",
-                "redirigir_a": "http://localhost:5173/scan-qr?salida=true " # cambia esta URL
-                # "redirigir_a": "https://parqueapp.eleueleo.com/scan-qr?salida=true " # cambia esta URL Producción
+                "redirigir_a": "/scan-qr?salida=true " # cambia esta URL
             }, status=status.HTTP_200_OK)
 
         else:
@@ -631,7 +629,7 @@ class QRReservaView(APIView):
 
     def get(self, request, id_reserva):
         reserva = get_object_or_404(Reserva, id_reserva=id_reserva, cliente=request.user)
-        url_qr = f"https://tusitio.com/api/reservas/validar-qr/{reserva.token_qr}/"
+        url_qr = f"/reservas/validar-qr/{reserva.token_qr}/"
         return Response({
             "url_qr": url_qr
         })
