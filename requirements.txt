@@ -32,6 +32,7 @@ PyJWT==2.9.0
 pyOpenSSL==25.1.0
 python-decouple==3.8
 python-dotenv==1.1.0
+pytz==2025.2
 pyzbar==0.1.9
 qrcode==8.2
 requests==2.32.3

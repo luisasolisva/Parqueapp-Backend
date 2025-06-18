@@ -2,7 +2,7 @@
 from django.urls import path
 from .views import (
     CrearReservaView, CancelarReservaView, DetalleReservaView, ReservasParqueaderoView, ListaEspaciosDisponiblesView, ValidarReservaView, ModificarReservaView, MapaDisponibilidadView, ReservasClienteView
-,ValidarQRView, QRReservaView )
+,ValidarQRView, QRReservaView, MapaDisponibilidadOperarioView )
 
 
 
@@ -19,6 +19,7 @@ urlpatterns = [
     path('obtener-qr/<uuid:id_reserva>/', QRReservaView.as_view(), name='reserva_qr_url'),
     path('modificar-reserva/<uuid:id_reserva>/', ModificarReservaView.as_view(), name='modificar_reserva'),
     path('mapa-disponibilidad/<uuid:id_parqueadero>/', MapaDisponibilidadView.as_view(), name='mapa-disponibilidad'),
+    path('mapa-disponibilidad-operario/', MapaDisponibilidadOperarioView.as_view(), name='mapa-disponibilidad-operario'),
     path('reservas-cliente/<uuid:id_cliente>/', ReservasClienteView.as_view(), name='reservas-cliente'),
 
     

@@ -628,3 +628,67 @@ class QRReservaView(APIView):
         return Response({
             "url_qr": url_qr
         })
+
+
+class MapaDisponibilidadOperarioView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.tipo_usuario != "Operario":
+            return Response({"error": "Solo los operarios pueden consultar este recurso."}, status=status.HTTP_403_FORBIDDEN)
+
+        operario = request.user
+        parqueadero = getattr(operario, "parqueadero", None)
+
+        if not parqueadero:
+            return Response({"error": "El operario no tiene un parqueadero asignado."}, status=status.HTTP_400_BAD_REQUEST)
+
+        mapa = get_object_or_404(MapaParqueadero, parqueadero=parqueadero)
+
+        colombia_tz = pytz.timezone("America/Bogota")
+        ahora_colombia = timezone.now().astimezone(colombia_tz)
+        fecha = ahora_colombia.date()
+        hora = ahora_colombia.time()
+        fecha_hora_consulta = ahora_colombia
+
+        espacios = EspacioParqueadero.objects.filter(mapa=mapa)
+        resultado = []
+
+        for espacio in espacios:
+            estado_actual = "disponible"
+            if espacio.estado == "Deshabilitado":
+                estado_actual = "deshabilitado"
+            else:
+                reservas = Reserva.objects.filter(
+                    id_espacio=espacio,
+                    estado__in=["Pendiente", "Confirmada"],
+                    fecha_inicio__lte=fecha,
+                    fecha_fin__gte=fecha
+                )
+
+                conflicto = any(
+                    timezone.make_aware(datetime.combine(r.fecha_inicio, r.hora_inicio)) <= fecha_hora_consulta <=
+                    timezone.make_aware(datetime.combine(r.fecha_fin, r.hora_fin))
+                    for r in reservas
+                )
+                if conflicto:
+                    estado_actual = "ocupado"
+
+            resultado.append({
+                "id_espacio": str(espacio.id_espacio),
+                "fila": espacio.fila,
+                "columna": espacio.columna,
+                "espacio": espacio.espacio,
+                "estado": estado_actual
+            })
+
+        return Response({
+            "mapaParqueadero": {
+                "mapaSize": {"filas": mapa.filas, "columnas": mapa.columnas},
+                "nomenclatura": mapa.nomenclatura,
+                "espacios": resultado
+            },
+            "fecha_actual": fecha.isoformat(),
+            "hora_actual": hora.strftime("%H:%M")
+        }, status=status.HTTP_200_OK)
+
