@@ -507,6 +507,10 @@ class MapaDisponibilidadView(APIView):
 
             if espacio.estado == "Deshabilitado":
                 estado_actual = "deshabilitado"
+
+            elif espacio.estado == "Ocupado" and fecha == timezone.localdate():
+                estado_actual = "ocupado"
+
             else:
                 # Buscamos reservas activas de ese espacio para ese día
                 reservas = Reserva.objects.filter(
@@ -534,6 +538,7 @@ class MapaDisponibilidadView(APIView):
                 "espacio": espacio.espacio,
                 "estado": estado_actual
             })
+
 
         return Response({
             "mapaParqueadero": {
@@ -641,8 +646,6 @@ import pytz
 
 from usuarios.models import Parqueadero, MapaParqueadero, EspacioParqueadero, Reserva, Usuario
 
-# ... (importaciones y clase sin cambios hasta aquí)
-
 class MapaDisponibilidadOperarioView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -678,6 +681,11 @@ class MapaDisponibilidadOperarioView(APIView):
             if espacio.estado == "Deshabilitado":
                 estado_actual = "deshabilitado"
                 deshabilitados += 1
+
+            elif espacio.estado == "Ocupado" and fecha == timezone.localdate():
+                estado_actual = "ocupado"
+                ocupados += 1
+
             else:
                 reservas = Reserva.objects.filter(
                     id_espacio=espacio,
