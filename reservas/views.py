@@ -605,7 +605,8 @@ class ValidarQRView(APIView):
             reserva.save(update_fields=["qr_usado_entrada", "estado"])
             return Response({
                 "mensaje": "QR validado para entrada. La reserva está en curso.",
-                "redirigir_a": "https://tusitio.com/frontend/reserva/entrada"  # cambia esta URL
+                "redirigir_a": "http://localhost:5173/scan-qr?entrada=true"  # cambia esta URL
+                # "redirigir_a": "https://parqueapp.eleueleo.com/scan-qr?entrada=true"  # cambia esta URL Producción
             }, status=status.HTTP_200_OK)
 
         elif not reserva.qr_usado_salida:
@@ -614,7 +615,8 @@ class ValidarQRView(APIView):
             reserva.save(update_fields=["qr_usado_salida", "estado"])
             return Response({
                 "mensaje": "QR validado para salida. La reserva ha finalizado.",
-                "redirigir_a": "https://tusitio.com/frontend/reserva/salida"  # cambia esta URL
+                "redirigir_a": "http://localhost:5173/scan-qr?salida=true " # cambia esta URL
+                # "redirigir_a": "https://parqueapp.eleueleo.com/scan-qr?salida=true " # cambia esta URL Producción
             }, status=status.HTTP_200_OK)
 
         else:
