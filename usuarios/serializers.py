@@ -208,3 +208,39 @@ class UserDeleteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Usuario
         fields = ['id', 'nombre', 'apellido', 'email', 'tipo_usuario']  # ✅ Display user details before deletion
+
+from usuarios.models import Parqueadero
+# En serializers.py
+class OperarioRegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = Usuario
+        fields = ['nombre', 'apellido', 'email', 'telefono', 'password']
+
+    def create(self, validated_data):
+        request = self.context['request']
+        creador = request.user
+
+        if creador.tipo_usuario != 'Administrador':
+            raise serializers.ValidationError("Solo los administradores pueden registrar operarios.")
+
+        # Obtener el parqueadero del administrador
+        parqueadero = Parqueadero.objects.filter(propietario=creador).first()
+        if not parqueadero:
+            raise serializers.ValidationError("No se encontró un parqueadero asociado al administrador.")
+
+        usuario = Usuario.objects.create_user(
+            email=validated_data['email'].lower(),
+            password=validated_data['password'],
+            nombre=validated_data['nombre'].title(),
+            apellido=validated_data['apellido'].title(),
+            telefono=validated_data['telefono'],
+            tipo_usuario='Operario',
+            parqueadero_asignado=parqueadero
+        )
+
+        # Opcional: enviar correo de activación
+        send_activation_email(usuario)
+
+        return usuario

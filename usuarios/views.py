@@ -285,3 +285,22 @@ class ActualizarPreferenciasView(APIView):
 
         estado = "activados" if recordatorios_activos else "desactivados"
         return Response({"mensaje": f"Los recordatorios han sido {estado} correctamente."}, status=200)
+
+# En views.py
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.generics import GenericAPIView
+from rest_framework.response import Response
+from rest_framework import status
+from .serializers import OperarioRegisterSerializer
+
+class RegisterOperarioView(GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = OperarioRegisterSerializer
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Operario registrado exitosamente y vinculado al parqueadero."},
+                            status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

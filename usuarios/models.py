@@ -53,8 +53,8 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     codigo_creado = models.DateTimeField(null=True, blank=True)  # Fecha de creación del código
     codigo_validado = models.BooleanField(default=False) # Estado de validación del código
     recordatorios_activos = models.BooleanField(default=True)  # ✅ Permite activar/desactivar recordatorios
-
     password = models.CharField(max_length=255)  # ¡Agrega este campo!
+    parqueadero_asignado = models.ForeignKey('Parqueadero', on_delete=models.SET_NULL, null=True, blank=True)
 
     groups = models.ManyToManyField(
         'auth.Group',
@@ -86,7 +86,7 @@ class Parqueadero(models.Model):
     longitud = models.DecimalField(max_digits=9, decimal_places=7)
     precio_hora = models.IntegerField()
     nombre_propietario = models.CharField(max_length=200) 
-    propietario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    propietario = models.ForeignKey('Usuario', on_delete=models.CASCADE)
     descripcion = models.TextField(blank=True, null=True) 
     imagenes = models.ManyToManyField('ImagenParqueadero', blank=True, related_name="lista_de_imagenes")  # ✅ Usa comillas para evitar NameError    
 
